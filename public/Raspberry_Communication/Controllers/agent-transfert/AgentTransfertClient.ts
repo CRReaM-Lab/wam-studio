@@ -10,11 +10,7 @@ import {
   type TransfertFormulaire,
   validerFormulaireTransfert,
 } from "../../utils/agent-transfert/AgentTransfertHelpers";
-import {
-  chargerBibliothequeSocketIo,
-  creerSocketAgent,
-  type SocketIoClient,
-} from "./AgentTransfertConnexion";
+import { creerSocketAgent, type SocketAgent } from "./AgentTransfertConnexion";
 
 export type ConfigPersisteeAgent = {
   sshHost?: string;
@@ -44,7 +40,7 @@ export type CallbacksTransfertUi = {
 };
 
 export default class AgentTransfertClient {
-  private socket: SocketIoClient | null = null;
+  private socket: SocketAgent | null = null;
   private transferIdCourant: string | null = null;
   private envoiEnCours = false;
   private erreurSocketDejaTraitee = false;
@@ -86,7 +82,7 @@ export default class AgentTransfertClient {
       logTransfertInfo(ok ? "Agent disponible" : "Agent repond mais ok=false", payload);
       return { ok, configPersistee: payload.configPersistee };
     } catch (error) {
-      const erreur = `Agent de transfert introuvable sur ${this.agentBaseUrl}. Lancez: npm run dev dans agent-transfert/`;
+      const erreur = `Agent de transfert introuvable sur ${this.agentBaseUrl} (serveur de modulePre arrêté ?)`;
       logTransfertErreur(erreur, error);
       return { ok: false, error: erreur };
     }
@@ -101,7 +97,7 @@ export default class AgentTransfertClient {
     try {
       const sante = await this.verifierSante();
       if (!sante.ok) {
-        return { ok: false, error: sante.error || "Agent de transfert indisponible (port 3100)." };
+        return { ok: false, error: sante.error || "Agent de transfert indisponible." };
       }
 
       const response = await fetch(`${this.agentBaseUrl}/remote/files/list`, {
@@ -150,7 +146,7 @@ export default class AgentTransfertClient {
     try {
       const sante = await this.verifierSante();
       if (!sante.ok) {
-        return { ok: false, error: sante.error || "Agent de transfert indisponible (port 3100)." };
+        return { ok: false, error: sante.error || "Agent de transfert indisponible." };
       }
 
       const response = await fetch(`${this.agentBaseUrl}/remote/files/delete`, {
@@ -200,7 +196,7 @@ export default class AgentTransfertClient {
     try {
       const sante = await this.verifierSante();
       if (!sante.ok) {
-        return { ok: false, error: sante.error || "Agent de transfert indisponible (port 3100)." };
+        return { ok: false, error: sante.error || "Agent de transfert indisponible." };
       }
 
       const response = await fetch(`${this.agentBaseUrl}/remote/files/download`, {
@@ -251,26 +247,25 @@ export default class AgentTransfertClient {
       await this.attendreSocketConnecte(this.socket);
       return;
     }
-    await chargerBibliothequeSocketIo(this.agentBaseUrl);
     const socket = creerSocketAgent(this.agentBaseUrl);
     this.socket = socket;
     this.brancherEcouteursSocket(socket);
     await this.attendreSocketConnecte(socket);
   }
 
-  private brancherEcouteursSocket(socket: SocketIoClient): void {
+  private brancherEcouteursSocket(socket: SocketAgent): void {
     if (this.ecouteursDejaBranches) {
       return;
     }
     this.ecouteursDejaBranches = true;
     socket.on("connect", () => {
       this.callbacks.onConnexionChange(true);
-      this.journal(`Socket.IO connecte (${socket.id || "?"})`);
+      this.journal(`WebSocket agent connecte (${socket.id || "?"})`);
       this.sAbonner();
     });
     socket.on("disconnect", () => {
       this.callbacks.onConnexionChange(false);
-      this.journal("Socket.IO deconnecte — reconnexion automatique...");
+      this.journal("WebSocket agent deconnecte — reconnexion automatique...");
     });
     socket.on("transfer:event", (raw) => this.relayEvenement(raw));
     socket.on("transfer:snapshot", (raw) => this.relaySnapshot(raw));
@@ -286,14 +281,14 @@ export default class AgentTransfertClient {
     });
   }
 
-  private attendreSocketConnecte(socket: SocketIoClient, timeoutMs = 15000): Promise<void> {
+  private attendreSocketConnecte(socket: SocketAgent, timeoutMs = 15000): Promise<void> {
     if (socket.connected) {
       return Promise.resolve();
     }
     return new Promise((resolve, reject) => {
       const timer = window.setTimeout(() => {
         socket.off("connect", onConnect);
-        reject(new Error("Connexion Socket.IO a l'agent trop longue (port 3100)."));
+        reject(new Error("Connexion WebSocket a l'agent trop longue."));
       }, timeoutMs);
       const onConnect = () => {
         window.clearTimeout(timer);
@@ -323,7 +318,7 @@ export default class AgentTransfertClient {
     }
     await this.connecter();
     if (!this.socket) {
-      const erreur = "Connexion Socket.IO impossible.";
+      const erreur = "Connexion WebSocket à l'agent impossible.";
       this.callbacks.onErreur(erreur);
       return { ok: false, error: erreur };
     }
@@ -456,7 +451,7 @@ export default class AgentTransfertClient {
       this.erreurSocketDejaTraitee = true;
     }
     if (event.type !== "progress") {
-      logTransfertInfo("Evenement Socket.IO", event);
+      logTransfertInfo("Evenement agent", event);
     }
     this.presenterEvenement(event);
   }

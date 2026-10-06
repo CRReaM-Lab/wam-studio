@@ -1,47 +1,92 @@
-type SocketIoClient = {
+/**
+ * Connexion temps réel à l'agent de transfert : un WebSocket simple sur `<agent>/ws`, servi par
+ * le serveur de modulePre (l'agent Node et son Socket.IO ne sont plus utilisés).
+ *
+ * Messages dans les deux sens : `{ event, data }`, avec les mêmes noms d'événements que Socket.IO
+ * (`command`, `subscribe` → ; `transfer:event`, `transfer:snapshot`, `agent:event`,
+ * `command:ack` ←). L'objet rendu imite la petite partie de l'API Socket.IO dont se sert
+ * `AgentTransfertClient` (on/off/emit, `connect`/`disconnect`, reconnexion automatique).
+ */
+type Ecouteur = (...args: unknown[]) => void;
+
+type SocketAgent = {
   id?: string;
   connected: boolean;
-  on: (event: string, handler: (...args: unknown[]) => void) => void;
-  off: (event: string, handler: (...args: unknown[]) => void) => void;
+  on: (event: string, handler: Ecouteur) => void;
+  off: (event: string, handler: Ecouteur) => void;
   emit: (event: string, payload?: unknown) => void;
   disconnect: () => void;
 };
 
-declare global {
-  interface Window {
-    io?: (url: string, opts?: Record<string, unknown>) => SocketIoClient;
-  }
-}
-
-let scriptChargeEnCours: Promise<void> | null = null;
-
-export async function chargerBibliothequeSocketIo(agentBaseUrl: string): Promise<void> {
-  if (window.io) return;
-  if (scriptChargeEnCours) {
-    await scriptChargeEnCours;
-    return;
-  }
-  scriptChargeEnCours = new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `${agentBaseUrl}/socket.io/socket.io.js`;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Impossible de charger Socket.IO depuis l'agent de transfert."));
-    document.head.appendChild(script);
-  });
-  await scriptChargeEnCours;
-}
-
-export function creerSocketAgent(agentBaseUrl: string): SocketIoClient {
-  if (!window.io) {
-    throw new Error("Socket.IO non charge. Appelez chargerBibliothequeSocketIo d'abord.");
-  }
-  // Socket.IO lit le chemin d'une URL comme un « namespace » : pour un agent servi sous un
-  // préfixe (ex. `/agent`), on se connecte à l'origine et on passe le préfixe dans `path`.
+/** `https://hote/agent` ou `/agent` → `wss://hote/agent/ws`. */
+function urlWebSocket(agentBaseUrl: string): string {
   const url = new URL(agentBaseUrl, window.location.href);
-  const prefixe = url.pathname.replace(/\/+$/, "");
-  return window.io(url.origin, { reconnection: true, path: `${prefixe}/socket.io` });
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/ws`;
+  return url.toString();
 }
 
-export type { SocketIoClient };
+export function creerSocketAgent(agentBaseUrl: string): SocketAgent {
+  const adresse = urlWebSocket(agentBaseUrl);
+  const ecouteurs = new Map<string, Set<Ecouteur>>();
+  let ws: WebSocket | null = null;
+  let arrete = false;
+  let delaiReconnexionMs = 1000;
+  let numero = 0;
+
+  const declencher = (event: string, payload?: unknown) => {
+    for (const handler of [...(ecouteurs.get(event) ?? [])]) handler(payload);
+  };
+
+  const socket: SocketAgent = {
+    connected: false,
+    on: (event, handler) => {
+      if (!ecouteurs.has(event)) ecouteurs.set(event, new Set());
+      ecouteurs.get(event)!.add(handler);
+    },
+    off: (event, handler) => {
+      ecouteurs.get(event)?.delete(handler);
+    },
+    emit: (event, payload) => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event, data: payload ?? {} }));
+      }
+    },
+    disconnect: () => {
+      arrete = true;
+      ws?.close();
+    },
+  };
+
+  const ouvrir = () => {
+    ws = new WebSocket(adresse);
+    ws.onopen = () => {
+      delaiReconnexionMs = 1000;
+      numero += 1;
+      socket.id = `ws-${numero}`;
+      socket.connected = true;
+      declencher("connect");
+    };
+    ws.onmessage = (message) => {
+      try {
+        const { event, data } = JSON.parse(String(message.data)) as { event?: string; data?: unknown };
+        if (event) declencher(event, data);
+      } catch {
+        // message illisible : ignoré
+      }
+    };
+    ws.onclose = () => {
+      const etaitConnecte = socket.connected;
+      socket.connected = false;
+      if (etaitConnecte) declencher("disconnect");
+      if (!arrete) {
+        window.setTimeout(ouvrir, delaiReconnexionMs);
+        delaiReconnexionMs = Math.min(delaiReconnexionMs * 2, 10000);
+      }
+    };
+  };
+  ouvrir();
+  return socket;
+}
+
+export type { SocketAgent };
