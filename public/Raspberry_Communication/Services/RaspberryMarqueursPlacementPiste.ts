@@ -143,7 +143,8 @@ function poserMarqueurAuClic(event: MouseEvent): void {
   const conteneur = lireConteneurMarqueursPiste();
   const rect = conteneur.getBoundingClientRect();
   const xCanvas = event.clientX - rect.left;
-  const tempsMs = pontCourant.lireTempsMsDepuisXCanvas(xCanvas);
+  const xAligne = pontCourant.alignerXCanvasSurGrille(xCanvas, event.shiftKey);
+  const tempsMs = pontCourant.lireTempsMsDepuisXCanvas(xAligne);
   const options = barre.lireOptions();
   const osc = lireOscDepuisBarre();
   if (osc === null) {
@@ -174,7 +175,10 @@ function suivreApercu(event: MouseEvent): void {
   }
   const conteneur = lireConteneurMarqueursPiste();
   const rect = conteneur.getBoundingClientRect();
-  const x = Math.max(0, event.clientX - rect.left);
+  const xSouris = event.clientX - rect.left;
+  // L'aperçu montre où le marqueur sera posé : sur la grille si l'aimant est actif (Maj : libre).
+  const xAligne = pontCourant ? pontCourant.alignerXCanvasSurGrille(xSouris, event.shiftKey) : xSouris;
+  const x = Math.max(0, xAligne);
   ligneApercu.style.display = "block";
   ligneApercu.style.transform = `translateX(${Math.round(x)}px)`;
 }
