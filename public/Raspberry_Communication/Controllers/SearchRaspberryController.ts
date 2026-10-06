@@ -1173,6 +1173,9 @@ export default class SearchRaspberryController {
     this.mettreAJourDomTransfertSiPossible(ip);
   }
 
+  /** Avertissements de l'agent pour l'envoi en cours, par IP (format du son). */
+  private readonly avertissementsTransfert = new Map<string, string[]>();
+
   private traiterEvenementTransfert(event: {
     type: string;
     state?: string;
@@ -1192,6 +1195,15 @@ export default class SearchRaspberryController {
     let scpPercent = precedent?.scpPercent ?? 0;
     let state = precedent?.state ?? "IDLE";
     let text = precedent?.text ?? "";
+    if (event.type === "state" && event.state === "RECEIVING") {
+      this.avertissementsTransfert.set(ip, []);
+    }
+    const avertissements = this.avertissementsTransfert.get(ip) ?? [];
+    if (event.type === "warning" && event.message) {
+      avertissements.push(event.message);
+      this.avertissementsTransfert.set(ip, avertissements);
+      text = `⚠ ${event.message}`;
+    }
 
     if (event.type === "progress" && event.phase === "upload") {
       uploadPercent = event.percent ?? uploadPercent;
@@ -1239,6 +1251,9 @@ export default class SearchRaspberryController {
     if (event.type === "completed") {
       state = "COMPLETED";
       text = "Transfert SCP termine avec succes.";
+    }
+    if (state === "COMPLETED" && avertissements.length > 0) {
+      text = `${text} ⚠ ${avertissements.join(" ")}`;
     }
     if (event.type === "error") {
       state = "FAILED";
