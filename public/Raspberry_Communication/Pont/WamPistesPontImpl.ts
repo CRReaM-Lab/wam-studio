@@ -212,6 +212,17 @@ export default class WamPistesPontImpl implements IWamPistesPont {
     return calculerTempsMsDepuisXCanvas(xCanvas, viewport.left, RATIO_MILLS_BY_PX);
   }
 
+  public alignerXCanvasSurGrille(xCanvas: number, sansAimant: boolean): number {
+    const editeur = this.app.editorView;
+    const case_ = editeur.cellSize;
+    if (!editeur.snapping || sansAimant || !(case_ > 0)) {
+      return xCanvas;
+    }
+    // Même règle que LoopController.adjustPosIfSnapping, en coordonnées du monde.
+    const xMonde = xCanvas + editeur.viewport.left;
+    return Math.round(xMonde / case_) * case_ - editeur.viewport.left;
+  }
+
   public lectureEstActive(): boolean {
     return this.app.host.isPlaying === true;
   }

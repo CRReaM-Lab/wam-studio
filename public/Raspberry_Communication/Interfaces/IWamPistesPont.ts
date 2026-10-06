@@ -46,6 +46,12 @@ export interface IWamPistesPont {
 
   lireTempsMsDepuisXCanvas(xCanvas: number): number;
 
+  /**
+   * Cale une abscisse du canvas des pistes sur la grille de l'éditeur, comme les régions et la
+   * boucle : seulement si l'aimant de WAM est actif et que `sansAimant` (touche Maj) est faux.
+   */
+  alignerXCanvasSurGrille(xCanvas: number, sansAimant: boolean): number;
+
   lectureEstActive(): boolean;
 
   pauserLecture(): void;
