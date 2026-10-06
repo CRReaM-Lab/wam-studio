@@ -33,7 +33,8 @@ export default class SearchRaspberryState {
   public transfertDraftByIp = new Map<string, TransfertDraft>();
   public transfertLastStatusByIp = new Map<string, TransfertLastStatus>();
   public agentTransfertActif = false;
-  public readonly agentTransfertBaseUrl = "http://localhost:3100";
+  /** `AGENT_TRANSFERT_URL` au build (.env) ; absolue ou relative à la page (ex. `/agent`). */
+  public readonly agentTransfertBaseUrl = process.env.AGENT_TRANSFERT_URL || "http://localhost:3100";
 
   public wsServerIp: string;
 

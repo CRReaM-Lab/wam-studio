@@ -37,7 +37,11 @@ export function creerSocketAgent(agentBaseUrl: string): SocketIoClient {
   if (!window.io) {
     throw new Error("Socket.IO non charge. Appelez chargerBibliothequeSocketIo d'abord.");
   }
-  return window.io(agentBaseUrl, { reconnection: true });
+  // Socket.IO lit le chemin d'une URL comme un « namespace » : pour un agent servi sous un
+  // préfixe (ex. `/agent`), on se connecte à l'origine et on passe le préfixe dans `path`.
+  const url = new URL(agentBaseUrl, window.location.href);
+  const prefixe = url.pathname.replace(/\/+$/, "");
+  return window.io(url.origin, { reconnection: true, path: `${prefixe}/socket.io` });
 }
 
 export type { SocketIoClient };

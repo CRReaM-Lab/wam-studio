@@ -13,7 +13,23 @@ export type HoteConnexionWebSocket = {
   onApresConnexionServeur?: () => void;
 };
 
+/**
+ * URL du WebSocket du serveur Raspberry.
+ *
+ * Par défaut : `ws(s)://<hôte de la page>:8383`. Si `RASPBERRY_WS_URL` est défini au build
+ * (.env), il est utilisé à la place ; une valeur relative (ex. `/ws`) se résout sur l'origine de
+ * la page, en `wss` quand la page est en HTTPS. Utile quand le serveur qui sert la page porte
+ * aussi le WebSocket (une page HTTPS ne peut pas ouvrir `ws://` ni un `wss://` sur un port en clair).
+ */
+const RASPBERRY_WS_URL = process.env.RASPBERRY_WS_URL || "";
+
 export function construireUrlWebSocketServeur(wsServerIp: string, wsServerPort: number): string {
+  if (RASPBERRY_WS_URL) {
+    const url = new URL(RASPBERRY_WS_URL, window.location.href);
+    if (url.protocol === "https:") url.protocol = "wss:";
+    if (url.protocol === "http:") url.protocol = "ws:";
+    return url.toString();
+  }
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   return `${protocol}://${wsServerIp}:${wsServerPort}`;
 }
