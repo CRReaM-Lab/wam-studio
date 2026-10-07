@@ -252,6 +252,12 @@ export default class RegionController {
     });
     regionView.on("pointerup", () => this.handlePointerUp());
     regionView.on("pointerupoutside", () => this.handlePointerUp() );
+    // Clic droit : annoncé à qui veut ouvrir un menu (envoi d'une région à un Pi son).
+    regionView.on("rightclick", (e) => {
+      window.dispatchEvent(new CustomEvent("wam:region-clic-droit", {
+        detail: { trackId: region.trackId, regionId: region.id, x: e.clientX, y: e.clientY },
+      }));
+    });
   }
 
 

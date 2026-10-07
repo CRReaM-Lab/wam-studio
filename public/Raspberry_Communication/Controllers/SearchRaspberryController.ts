@@ -9,6 +9,7 @@ import {
   formaterTexteErreurTransfert,
   type TransfertDraft,
   type TransfertFormulaire,
+  SON_NUMERO_DEFAUT,
 } from "../utils/agent-transfert/AgentTransfertHelpers";
 import {
   mettreAJourStatutTransfertPanneau,
@@ -89,6 +90,8 @@ import {
 } from "../Views/SearchRaspberryFenetreEnvoiAudio";
 import { ouvrirFenetreSuppressionAudio } from "../Views/SearchRaspberryFenetreSuppressionAudio";
 import { ouvrirFenetreImportAudio } from "../Views/SearchRaspberryFenetreImportAudio";
+import { ouvrirMenuRegion } from "../Views/SearchRaspberryMenuRegion";
+import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
 import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSequenceurOsc";
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
 import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPanneauOscPlay";
@@ -227,6 +230,7 @@ export default class SearchRaspberryController {
       return null;
     });
     this.liaisonPistes = new RaspberryPisteLiaisonService(pont);
+    pont.abonnerClicDroitRegion((trackId, regionId, x, y) => this.ouvrirMenuRegion(trackId, regionId, x, y));
     this.autoCreationPistes = new RaspberryPisteAutoCreationService(this.liaisonPistes);
     this.exportPistes = new RaspberryPisteExportService(pont);
     this.envoiAudioLot = new RaspberryEnvoiAudioLotService(
@@ -638,6 +642,115 @@ export default class SearchRaspberryController {
     );
     this.rafraichirPanneauDetailsSiSelectionne(raspberry.ip, { forcer: true });
     logTransfertInfo("Envoi piste liee termine", { ip: raspberry.ip });
+  }
+
+  /**
+   * Clic droit sur une région : l'envoyer au Pi de sa piste « rasp N », sous le premier numéro
+   * de son libre à partir du numéro de départ de la piste (500 par défaut).
+   */
+  private ouvrirMenuRegion(trackId: number, regionId: number, x: number, y: number): void {
+    const pont = this.pontPistes;
+    const binding = raspberryTrackBindingStore.trouverParTrackId(trackId);
+    if (!pont || !binding || binding.liee === false) {
+      ouvrirMenuRegion(x, y, {
+        type: "indisponible",
+        titre: "Envoyer au Pi",
+        raison: "Seules les régions d'une piste liée à un Pi (rasp N) s'envoient.",
+      });
+      return;
+    }
+    const titre = `Envoyer à rasp ${binding.raspberryId} (${binding.raspberryIp})`;
+    const raspberry = this.state.raspberryMap.get(binding.raspberryIp);
+    if (!raspberry?.isOnline) {
+      ouvrirMenuRegion(x, y, { type: "indisponible", titre, raison: `rasp ${binding.raspberryId} est hors ligne.` });
+      return;
+    }
+    const regions = pont.listerRegionsAudioPiste(trackId);
+    const rang = regions.findIndex((r) => r.regionId === regionId);
+    const region = rang >= 0 ? { ...regions[rang], rang } : undefined;
+    if (!region) {
+      ouvrirMenuRegion(x, y, { type: "indisponible", titre, raison: "Seules les régions audio s'envoient (pas le MIDI)." });
+      return;
+    }
+    ouvrirMenuRegion(x, y, {
+      type: "envoi",
+      titre,
+      proposer: () => this.premierNumeroLibre(raspberry.ip, binding.sonNumber),
+      envoyer: (numero) => this.envoyerRegionVersRaspberry(binding, raspberry, region, numero),
+      lireStatut: () => this.state.transfertLastStatusByIp.get(raspberry.ip)?.text,
+    });
+  }
+
+  /** Le premier numéro ≥ `depart` sans fichier `son{N}*.wav` sur le Pi, et les numéros présents. */
+  private async premierNumeroLibre(
+    ip: string,
+    depart: number
+  ): Promise<{ numero: number; pris: Set<number> | null; remarque?: string }> {
+    depart = Math.max(depart, SON_NUMERO_DEFAUT);
+    const liste = await this.agentTransfert.listerFichiersSonSurPi(ip);
+    if (!liste.ok) {
+      return { numero: depart, pris: null, remarque: `sons du Pi illisibles : ${liste.error}` };
+    }
+    const pris = new Set(
+      liste.fichiers
+        .map((nom) => /^son(\d+)(-\d+)?\.[a-z0-9]+$/i.exec(nom)?.[1])
+        .filter((n): n is string => n !== undefined)
+        .map(Number)
+    );
+    let numero = depart;
+    while (pris.has(numero)) numero++;
+    return { numero, pris, remarque: numero === depart ? undefined : `${depart} à ${numero - 1} déjà sur le Pi` };
+  }
+
+  private async envoyerRegionVersRaspberry(
+    binding: RaspberryTrackBinding,
+    raspberry: Raspberry,
+    /** `rang` : position de la région sur la piste (la mémoire des étiquettes s'en sert). */
+    region: { regionId: number; startMs: number; durationMs: number; rang: number },
+    numero: number
+  ): Promise<{ ok: boolean; message: string }> {
+    const pont = this.pontPistes;
+    const blob = pont?.exporterRegionAudio(binding.trackId, region.regionId);
+    if (!pont || !blob) {
+      return { ok: false, message: "Région introuvable." };
+    }
+    const nomFichier = `son${numero}.wav`;
+    const fichier = new File([blob], nomFichier, { type: "audio/wav" });
+    this.ipTransfertCourant = raspberry.ip;
+    mettreAJourStatutTransfertPanneau(this.state, raspberry.ip, {
+      ok: true,
+      state: "RECEIVING",
+      text: `Envoi de la région vers ${raspberry.ip} (${nomFichier})...`,
+      uploadPercent: 0,
+      scpPercent: 0,
+    });
+    const resultat = await this.agentTransfert.envoyerFichierComplet(fichier, {
+      sshHost: raspberry.ip,
+      sshPort: 22,
+      sshUsername: "pi",
+      raspberryId: binding.raspberryId,
+      sonNumber: numero,
+    });
+    this.rafraichirPanneauDetailsSiSelectionne(raspberry.ip, { forcer: true });
+    if (!resultat.ok) {
+      return { ok: false, message: resultat.error };
+    }
+    invaliderCacheFichiersSonPi(raspberry.ip);
+    // Le prochain envoi de cette piste repart du numéro envoyé (gardé avec le projet).
+    binding.sonNumber = numero;
+    nommerRegionApresEnregistrement(pont, {
+      trackId: binding.trackId,
+      regionId: region.regionId,
+      raspberryId: binding.raspberryId,
+      startMs: region.startMs,
+      durationMs: region.durationMs,
+      nomFichier,
+      sonNumber: numero,
+      indexOrdre: region.rang,
+    });
+    const statut = this.state.transfertLastStatusByIp.get(raspberry.ip)?.text ?? "";
+    const avertissements = statut.includes("⚠") ? `\n⚠${statut.split("⚠").slice(1).join("⚠")}` : "";
+    return { ok: true, message: `${nomFichier} envoyé sur rasp ${binding.raspberryId}.${avertissements}` };
   }
 
   private enregistrerNomRegionApresEnvoiPiste(

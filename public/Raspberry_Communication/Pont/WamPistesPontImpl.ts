@@ -72,6 +72,29 @@ export default class WamPistesPontImpl implements IWamPistesPont {
     return this.lireRegionsAudioOrdonnees(trackId).map((region) => region.save());
   }
 
+  public exporterRegionAudio(trackId: number, regionId: number): Blob | null {
+    const region = this.lireRegionsAudioOrdonnees(trackId).find((r) => r.id === regionId);
+    return region ? region.save() : null;
+  }
+
+  public abonnerClicDroitRegion(
+    surClic: (trackId: number, regionId: number, x: number, y: number) => void
+  ): () => void {
+    // Pas de menu du navigateur sur l'arrangeur : le clic droit y est à nous.
+    const canvas = this.app.editorView.view as HTMLCanvasElement;
+    const bloquerMenu = (e: Event) => e.preventDefault();
+    const ecouteur = (e: Event) => {
+      const { trackId, regionId, x, y } = (e as CustomEvent).detail;
+      surClic(trackId, regionId, x, y);
+    };
+    canvas.addEventListener("contextmenu", bloquerMenu);
+    window.addEventListener("wam:region-clic-droit", ecouteur);
+    return () => {
+      canvas.removeEventListener("contextmenu", bloquerMenu);
+      window.removeEventListener("wam:region-clic-droit", ecouteur);
+    };
+  }
+
   public pisteADuContenu(trackId: number): boolean {
     const track = this.app.tracksController.getTrackById(trackId);
     return (track?.regions.length ?? 0) > 0;

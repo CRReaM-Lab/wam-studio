@@ -28,6 +28,14 @@ export interface IWamPistesPont {
 
   exporterRegionsAudioPiste(trackId: number): Blob[];
 
+  /** Une région audio en WAV (null si elle n'existe pas ou n'est pas audio). */
+  exporterRegionAudio(trackId: number, regionId: number): Blob | null;
+
+  /** Clic droit sur une région de l'arrangeur (coordonnées de la fenêtre). Rend le désabonnement. */
+  abonnerClicDroitRegion(
+    surClic: (trackId: number, regionId: number, x: number, y: number) => void
+  ): () => void;
+
   pisteADuContenu(trackId: number): boolean;
 
   pisteExiste(trackId: number): boolean;
