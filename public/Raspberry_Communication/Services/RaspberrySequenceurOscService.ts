@@ -26,6 +26,17 @@ export type EvenementSequenceurOsc = {
   commandeOsc: string;
 };
 
+/** Niveaux réglés dans la fenêtre séquenceur, par région : la lecture (Play) les reprend. */
+const niveauxSaisis = new Map<string, number>();
+
+function cleNiveau(evenement: Pick<EvenementSequenceurOsc, "raspberryId" | "startMs" | "sonNumber">): string {
+  return `${evenement.raspberryId}|${evenement.startMs}|${evenement.sonNumber ?? ""}`;
+}
+
+export function memoriserNiveau(evenement: EvenementSequenceurOsc): void {
+  niveauxSaisis.set(cleNiveau(evenement), evenement.niveau);
+}
+
 /** Construit /play {numero} {niveau} avec bornes 0–127. */
 export function construireCommandePlayOsc(
   sonNumber: number | null,
@@ -98,6 +109,7 @@ export default class RaspberrySequenceurOscService {
         niveau: OSC_PLAY_NIVEAU_DEFAUT,
         commandeOsc: "",
       };
+      evenement.niveau = niveauxSaisis.get(cleNiveau(evenement)) ?? OSC_PLAY_NIVEAU_DEFAUT;
       actualiserCommandeOscEvenement(evenement);
       return evenement;
     });

@@ -4,6 +4,7 @@ import type {
 } from "../Services/RaspberrySequenceurOscService";
 import {
   actualiserCommandeOscEvenement,
+  memoriserNiveau,
   construireTexteLogAttenteComposition,
   construireTexteLogComposition,
   listerRaspberriesPourStop,
@@ -14,9 +15,6 @@ import { creerJoueurSequenceur } from "../Services/RaspberrySequenceurJoueur";
 import { formaterTempsPiste } from "../utils/osc/FormatTempsPiste";
 import { lireNiveauPlay } from "../utils/osc/OscPlayHelpers";
 import {
-  DELAI_APRES_COMPOSITION_MS,
-  lancerLectureSequenceur,
-  type ControleLectureSequenceur,
 } from "../Services/RaspberrySequenceurLecture";
 import { activerDeplacementFenetre } from "./sequenceur/activerDeplacementFenetre";
 import { lireMarqueursSequenceur } from "../Services/RaspberryMarqueursStore";
@@ -164,6 +162,7 @@ function creerInputNiveau(
     evenement.niveau = lireNiveauPlay(input.value);
     input.value = String(evenement.niveau);
     actualiserCommandeOscEvenement(evenement);
+    memoriserNiveau(evenement);
     onChange();
   });
   return input;
@@ -369,6 +368,16 @@ export function ouvrirFenetreSequenceurOsc(params: {
   envoyerComposition: (ip: string, raspberryId: number) => { ok: boolean; detail: string };
   envoyerStop: (ip: string, raspberryId: number) => { ok: boolean; detail: string };
   appliquerEffetPiste?: (adresse: string, valeur: string) => void;
+  /** La lecture de WAM (une seule lecture : le serveur la déroule sur les Pi). */
+  transport: {
+    jouer: () => void;
+    arreter: () => void;
+    reprendreApresCue: () => void;
+    estEnLecture: () => boolean;
+    /** Le libellé du cue où la lecture attend, ou null. */
+    cueEnAttente: () => string | null;
+    positionMs: () => number;
+  };
 }): void {
   fermerOverlay();
 
@@ -468,9 +477,10 @@ export function ouvrirFenetreSequenceurOsc(params: {
   boutonStop.disabled = true;
   const boutonContinuer = creerBouton("Continuer (Espace)", { primaire: true });
   boutonContinuer.style.display = "none";
-  const boutonLancer = creerBouton("Lancer son", { primaire: true });
+  const boutonLancer = creerBouton("Lancer (Play)", { primaire: true });
 
-  let lecture: ControleLectureSequenceur | null = null;
+  /** Pendant la lecture (ou un cue), le programme affiché ne bouge pas. */
+  let programmeFige = false;
   const lignesLog: LigneLog[] = [];
   let filtreActif = FILTRE_TOUS;
   let timerSync: number | null = null;
@@ -497,7 +507,7 @@ export function ouvrirFenetreSequenceurOsc(params: {
   };
 
   const synchroniserDepuisPistes = (forcer = false): void => {
-    if (lecture && !forcer) {
+    if (programmeFige && !forcer) {
       return;
     }
     const suivant = fusionnerProgrammeEtMarqueurs(params.copier(), lireMarqueursSequenceur());
@@ -524,40 +534,29 @@ export function ouvrirFenetreSequenceurOsc(params: {
     afficherLogs(zoneLogs, lignesLog, filtreActif);
   });
 
-  const joueur = creerJoueurSequenceur({
-    envoyerOsc: params.envoyerOsc,
-    envoyerStop: (evenement) => {
-      if (!evenement.ip) {
-        return { ok: false, detail: "IP Raspberry introuvable" };
-      }
-      return params.envoyerStop(evenement.ip, evenement.raspberryId);
-    },
-    estLectureActive: () => lecture !== null,
-    onLog: (texte, raspberryId) => ajouterLog(texte, raspberryId),
-  });
-
-  const arreterLecture = (couperSons: boolean) => {
-    const etaitEnLecture = lecture !== null;
-    lecture?.arreter();
-    lecture = null;
-    joueur.reinitialiser();
-    boutonLancer.disabled = false;
-    boutonStop.disabled = true;
-    boutonContinuer.style.display = "none";
-    bandeauCue.style.display = "none";
-    timerAffiche.innerText = "Timer : 0s";
-    if (couperSons && etaitEnLecture) {
-      arreterSonsEnCours(
-        programme,
-        params.listerRaspberriesConnectes(),
-        params.envoyerStop,
-        ajouterLog
-      );
+  // Une seule lecture : cette fenêtre est la télécommande de la lecture de WAM, que le serveur
+  // déroule sur les Pi (plus de minuteries ici). Elle suit la position et les cues.
+  let etaitEnLecture = false;
+  const suivreTransport = () => {
+    const enLecture = params.transport.estEnLecture();
+    const cue = params.transport.cueEnAttente();
+    programmeFige = enLecture || cue !== null;
+    boutonLancer.disabled = enLecture;
+    boutonStop.disabled = !enLecture && cue === null;
+    boutonContinuer.style.display = cue !== null ? "inline-block" : "none";
+    bandeauCue.style.display = cue !== null ? "block" : "none";
+    if (cue !== null) bandeauCue.innerText = `Cue « ${cue} » : appuyez sur Espace pour continuer.`;
+    const suffixe = cue !== null ? "  (cue)" : "";
+    timerAffiche.innerText = `Timer : ${formaterTempsPiste(params.transport.positionMs())}${suffixe}`;
+    if (enLecture !== etaitEnLecture) {
+      ajouterLog(enLecture ? "Lecture : WAM et les Pi (serveur)." : cue !== null ? `Cue « ${cue} » : pause.` : "Lecture arrêtée.");
+      etaitEnLecture = enLecture;
     }
   };
+  const suiviTransport = window.setInterval(suivreTransport, 100);
 
   overlay.addEventListener("raspberry-sequenceur-fermer", () => {
-    arreterLecture(true);
+    window.clearInterval(suiviTransport);
     if (timerSync !== null) {
       clearInterval(timerSync);
       timerSync = null;
@@ -567,126 +566,31 @@ export function ouvrirFenetreSequenceurOsc(params: {
     arreterDeplacement();
   });
 
-  const reprendreApresCue = () => {
-    if (!lecture?.estEnPauseCue()) {
-      return;
-    }
-    lecture.reprendre();
-    boutonContinuer.style.display = "none";
-    bandeauCue.style.display = "none";
-    ajouterLog("Cue : reprise (Espace).");
-  };
-
   function onToucheEspace(event: KeyboardEvent): void {
-    if (event.code !== "Space" && event.key !== " ") {
-      return;
-    }
-    const cible = event.target as HTMLElement | null;
-    if (cible && cible.closest("input, textarea, select")) {
-      return;
-    }
-    if (!lecture?.estEnPauseCue()) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    reprendreApresCue();
+    // Espace pendant un cue est déjà pris par la lecture des cues de WAM.
+    return;
   }
 
-  const envoyerMarqueurOsc = (evenement: EvenementSequenceurOsc): void => {
-    const osc = parserAdresseOscPersonnalisee(
-      evenement.oscAdresse || evenement.commandeOsc,
-      evenement.oscValeur || ""
-    );
-    if (!osc) {
-      ajouterLog(`${construireTexteLogMarqueur(evenement)} — adresse OSC invalide`);
-      return;
-    }
-    params.appliquerEffetPiste?.(osc.message, osc.value);
-    const connectes = params.listerRaspberriesConnectes();
-    if (connectes.length === 0) {
-      ajouterLog(`${construireTexteLogMarqueur(evenement)} — aucun Raspberry connecté`);
-      return;
-    }
-    ajouterLog(construireTexteLogMarqueur(evenement));
-    for (const raspberry of connectes) {
-      if (!raspberry.ip) {
-        ajouterLog(`OSC ${osc.message} — IP introuvable`, raspberry.raspberryId);
-        continue;
-      }
-      envoyerOscVersRaspberry(
-        (ip, raspberryId) => params.envoyerOscPersonnalise(ip, raspberryId, osc.message, osc.value),
-        raspberry,
-        `[${formaterTempsPiste(evenement.startMs)}] Raspberry ${raspberry.raspberryId} (${raspberry.ip})  ${osc.message} ${osc.value}`.trim(),
-        ajouterLog
-      );
-    }
-  };
-
   boutonLancer.addEventListener("click", () => {
-    if (lecture) {
-      return;
-    }
     synchroniserDepuisPistes(true);
     if (programme.length === 0) {
       ajouterLog("Rien a lancer : aucune region ni marqueur.");
       return;
     }
-    for (const evenement of programme) {
-      if (!estEvenementMarqueur(evenement)) {
-        actualiserCommandeOscEvenement(evenement);
-      }
-    }
-    boutonLancer.disabled = true;
-    boutonStop.disabled = false;
-    ajouterLog("Lecture demarree.");
-    joueur.reinitialiser();
-    const compositionEnvoyee = preparerRaspberriesAvantLecture(
-      params.listerRaspberriesConnectes(),
-      params.envoyerComposition,
-      ajouterLog
-    );
-    if (compositionEnvoyee) {
-      ajouterLog(construireTexteLogAttenteComposition(DELAI_APRES_COMPOSITION_MS));
-    }
-    lecture = lancerLectureSequenceur({
-      evenements: programme,
-      delaiDemarrageMs: compositionEnvoyee ? DELAI_APRES_COMPOSITION_MS : 0,
-      onTick: (timerMs) => {
-        const suffixe = lecture?.estEnPauseCue() ? "  (cue)" : "";
-        timerAffiche.innerText = `Timer : ${formaterTempsPiste(timerMs)}${suffixe}`;
-      },
-      onEvenement: (evenement) => {
-        if (estEvenementCue(evenement)) {
-          bandeauCue.style.display = "block";
-          boutonContinuer.style.display = "inline-block";
-          ajouterLog(construireTexteLogMarqueur(evenement));
-          return;
-        }
-        if (estEvenementMarqueur(evenement)) {
-          envoyerMarqueurOsc(evenement);
-          return;
-        }
-        return joueur.jouer(evenement);
-      },
-      onFin: () => {
-        arreterLecture(false);
-        ajouterLog("Lecture terminee.");
-      },
-    });
+    params.transport.jouer();
   });
 
   boutonContinuer.addEventListener("click", () => {
-    reprendreApresCue();
+    params.transport.reprendreApresCue();
   });
 
   boutonStop.addEventListener("click", () => {
-    arreterLecture(true);
-    ajouterLog("Stop : sons en cours coupés, commandes OSC suivantes annulées.");
+    params.transport.arreter();
+    ajouterLog("Stop : sons en cours coupés sur les Pi.");
   });
 
   boutonFermer.addEventListener("click", () => {
-    arreterLecture(true);
+    window.clearInterval(suiviTransport);
     fermerFenetre();
   });
 

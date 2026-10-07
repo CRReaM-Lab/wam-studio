@@ -10,6 +10,8 @@ import { audioCtx } from "../index";
 import { appliquerIndicateurRaspberry } from "../../Raspberry_Communication/Services/RaspberryIndicateurPisteUi";
 import { raspberryTrackBindingStore } from "../../Raspberry_Communication/Services/RaspberryTrackBindingStore";
 import { declencherSynchronisationPistesRaspberry } from "../../Raspberry_Communication/Services/RaspberryPisteSynchronisation";
+import { ecrireMarqueursSequenceur, lireMarqueursSequenceur } from "../../Raspberry_Communication/Services/RaspberryMarqueursStore";
+import type { MarqueurSequenceur } from "../../Raspberry_Communication/Models/MarqueurSequenceur";
 
 
 /**
@@ -82,6 +84,8 @@ export interface ProjectData {
             sonNumber: number;
         };
     }[];
+    /** Marqueurs OSC et cues de la timeline (absents des projets d'avant : on garde ceux du navigateur). */
+    marqueurs?: MarqueurSequenceur[];
 }
 
 /**
@@ -176,7 +180,8 @@ export default class Loader {
                 volume: this._app.host.volume,
                 plugin: pluginHostState
             },
-            tracks: tracks
+            tracks: tracks,
+            marqueurs: lireMarqueursSequenceur(),
         }
         console.log("Save Project:",project,contents)
         return [project,contents]
@@ -205,6 +210,9 @@ export default class Loader {
         this._app.hostController.stopAllTracks()
         this._app.tracksController.clearTracks()
         raspberryTrackBindingStore.reinitialiser()
+        // Les marqueurs viennent du projet ; un projet d'avant n'en a pas : ceux du navigateur
+        // restent, et partiront avec lui à la prochaine sauvegarde.
+        if (Array.isArray(project.marqueurs)) ecrireMarqueursSequenceur(project.marqueurs)
         this._app.host.playhead = 0
         this._app.host.volume=project.host.volume
         this._app.hostView.tempoSelector.tempo = project.host.tempo

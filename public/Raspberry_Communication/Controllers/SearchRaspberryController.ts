@@ -22,6 +22,7 @@ import Raspberry from "../Models/Raspberry";
 import {
   logTransfertErreur,
   logTransfertInfo,
+  logTransfertAvertissement,
 } from "../utils/agent-transfert/AgentTransfertLogger";
 import {
   brancherLectureRaspberryEnLigne,
@@ -91,6 +92,10 @@ import {
 import { ouvrirFenetreSuppressionAudio } from "../Views/SearchRaspberryFenetreSuppressionAudio";
 import { ouvrirFenetreImportAudio } from "../Views/SearchRaspberryFenetreImportAudio";
 import { ouvrirMenuRegion } from "../Views/SearchRaspberryMenuRegion";
+import { demarrerLectureServeur } from "../Services/RaspberryLectureServeur";
+import { ecrireCueEnAttente, lireCueEnAttente } from "../Services/RaspberryMarqueursCueEtat";
+import { lireMarqueursSequenceur } from "../Services/RaspberryMarqueursStore";
+import { actualiserBandeauCuePiste } from "../Services/RaspberryMarqueursPisteUi";
 import { ouvrirFenetreInventaire } from "../Views/SearchRaspberryFenetreInventaire";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
 import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSequenceurOsc";
@@ -263,6 +268,17 @@ export default class SearchRaspberryController {
             brancherEditionMarqueursPiste(pont);
             demarrerCueLecturePistes(pont);
             demarrerOscLecturePistes(pont);
+            // Une seule lecture : Play dans WAM joue aussi sur les Pi, par le serveur.
+            demarrerLectureServeur({
+              pont,
+              envoyer: (message) => {
+                const envoye = this.envoyerMessage(message);
+                if (!envoye) logTransfertAvertissement(`Lecture sur les Pi : serveur non connecté (${message.type} perdu).`);
+                return envoye;
+              },
+              regions: () =>
+                this.sequenceurOsc?.copierDepuisPistes(Array.from(this.state.raspberryMap.values())) ?? [],
+            });
             demarrerReveilAudioContexte(pont);
             this.persistancePistes?.demarrerAutosave();
             enregistrerSynchronisationPistesRaspberry(() => {
@@ -392,6 +408,30 @@ export default class SearchRaspberryController {
       envoyerStop: (ip, raspberryId) => envoyerCommandeOsc(ip, raspberryId, "/stop", "-1"),
       envoyerOscPersonnalise: (ip, raspberryId, adresse, valeur) =>
         envoyerCommandeOsc(ip, raspberryId, adresse, valeur),
+      transport: {
+        jouer: () => this.pontPistes?.reprendreLecture(),
+        arreter: () => {
+          // Stop coupe les sons, même arrêté sur un cue (le serveur les y avait laissés).
+          const surCue = lireCueEnAttente() !== null;
+          ecrireCueEnAttente(null);
+          actualiserBandeauCuePiste();
+          if (this.pontPistes?.lectureEstActive()) this.pontPistes.pauserLecture();
+          else if (surCue) this.envoyerMessage({ type: "programmeArreter", couper: true });
+        },
+        reprendreApresCue: () => {
+          if (lireCueEnAttente() === null) return;
+          ecrireCueEnAttente(null);
+          actualiserBandeauCuePiste();
+          this.pontPistes?.reprendreLecture();
+        },
+        estEnLecture: () => this.pontPistes?.lectureEstActive() ?? false,
+        cueEnAttente: () => {
+          const cue = lireCueEnAttente();
+          if (!cue) return null;
+          return lireMarqueursSequenceur().find((m) => m.id === cue.id)?.libelle || "Cue";
+        },
+        positionMs: () => this.pontPistes?.lirePlayheadMs() ?? 0,
+      },
       appliquerEffetPiste: (adresse, valeur) => {
         if (this.pontPistes) {
           appliquerEffetOscSurPistes(this.pontPistes, adresse, valeur);
