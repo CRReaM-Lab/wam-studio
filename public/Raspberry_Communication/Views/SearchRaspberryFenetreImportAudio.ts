@@ -38,8 +38,11 @@ function appliquerStyleModal(modal: HTMLDivElement): void {
   modal.style.borderRadius = "8px";
   modal.style.width = "660px";
   modal.style.maxWidth = "95vw";
-  modal.style.maxHeight = "80vh";
-  modal.style.overflow = "auto";
+  /* Une colonne : seule la liste des sons défile, la fenêtre garde ses boutons en vue. */
+  modal.style.maxHeight = "85vh";
+  modal.style.overflow = "hidden";
+  modal.style.display = "flex";
+  modal.style.flexDirection = "column";
 }
 
 function lireCibleParIp(cibles: CibleImportAudio[], ip: string): CibleImportAudio | undefined {
@@ -148,7 +151,8 @@ export function ouvrirFenetreImportAudio(params: {
   listeSons.style.border = "1px solid #3b4046";
   listeSons.style.borderRadius = "6px";
   listeSons.style.padding = "8px";
-  listeSons.style.maxHeight = "360px";
+  listeSons.style.flex = "1 1 auto";
+  listeSons.style.minHeight = "120px";
   listeSons.style.overflow = "auto";
   listeSons.style.fontSize = "13px";
   listeSons.innerText = enLigne.length === 0 ? "Aucun Raspberry disponible." : "Chargement...";
@@ -270,6 +274,12 @@ export function ouvrirFenetreImportAudio(params: {
       rangee.appendChild(apercu);
       bloc.appendChild(rangee);
 
+      const resume = document.createElement("div");
+      resume.style.fontSize = "11px";
+      resume.style.opacity = "0.65";
+      resume.style.margin = "1px 0 0 24px";
+      bloc.appendChild(resume);
+
       const alertes = document.createElement("div");
       alertes.style.fontSize = "11px";
       alertes.style.color = "#ffc46b";
@@ -294,7 +304,8 @@ export function ouvrirFenetreImportAudio(params: {
           }
           const a = resultat.analyse;
           dessinerFormeOnde(apercu, a);
-          apercu.title = `${resumerAnalyse(a)}\nCliquer pour le spectrogramme`;
+          apercu.title = "Cliquer pour le spectrogramme";
+          resume.innerText = resumerAnalyse(a);
           alertes.innerText = a.avertissements.join(" · ");
           apercu.onclick = () => {
             const ouvert = detail.style.display !== "none";
@@ -320,7 +331,8 @@ export function ouvrirFenetreImportAudio(params: {
     boutonToutDecocher.disabled = false;
   };
 
-  const chargerSons = async () => {
+  /** `garder` : un message à laisser affiché (le résultat d'un import), suivi du nombre de sons. */
+  const chargerSons = async (garder = "") => {
     const ip = selectRaspberry.value;
     if (!ip || chargement) {
       return;
@@ -329,7 +341,7 @@ export function ouvrirFenetreImportAudio(params: {
     boutonActualiser.disabled = true;
     boutonImporter.disabled = true;
     listeSons.innerText = "Chargement des fichiers sur le Pi...";
-    statut.innerText = "";
+    statut.innerText = garder;
     mettreAJourInfoPiste();
 
     const resultat = await params.listerSons(ip);
@@ -347,7 +359,8 @@ export function ouvrirFenetreImportAudio(params: {
     }
 
     remplirListeSons(resultat.fichiers, ip);
-    statut.innerText = `${resultat.fichiers.length} son(s) disponible(s) sur le Pi.`;
+    const nombre = `${resultat.fichiers.length} son(s) disponible(s) sur le Pi.`;
+    statut.innerText = garder ? `${garder}\n${nombre}` : nombre;
   };
 
   selectRaspberry.addEventListener("change", () => {
@@ -395,7 +408,7 @@ export function ouvrirFenetreImportAudio(params: {
     boutonImporter.disabled = false;
     statut.innerText = resultat.message;
     if (resultat.ok) {
-      await chargerSons();
+      await chargerSons(resultat.message);
     }
   });
 

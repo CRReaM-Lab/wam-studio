@@ -91,8 +91,8 @@ button {
     </div>
     
     <div class="confirm-div" id="confirm" style="display: none" >
-        <button id="yes" type="button">Yes</button>
-        <button id="no" type="button">No</button>
+        <button id="yes" type="button">Remplacer</button>
+        <button id="no" type="button">Annuler</button>
     </div>
     
     <button id="save-project" type="button">Save Project</button>
@@ -149,20 +149,32 @@ export default class SaveProjectElement extends HTMLElement {
     
     private _placeHolderErrorLog() {
         this.log.innerHTML = "<br>";
+        this.log.style.backgroundColor = "transparent";
+    }
+
+    /** Les minuteries du fondu d'un message : annulées dès qu'un autre message le remplace. */
+    private _fondus: ReturnType<typeof setTimeout>[] = [];
+
+    private _annulerFondu() {
+        this._fondus.forEach(clearTimeout);
+        this._fondus = [];
+        this.log.style.transition = "";
+        this.log.style.opacity = "1";
     }
 
     private _showLog(message: string, color: string) {
+        this._annulerFondu();
         this.log.innerHTML = message;
         this.log.style.backgroundColor = color;
         this.log.style.transition = "opacity 1s ease-in-out"; // add transition property
-        setTimeout(() => {
+        this._fondus.push(setTimeout(() => {
             this.log.style.opacity = "0"; // fade out the element
-            setTimeout(() => {
+            this._fondus.push(setTimeout(() => {
                 this._placeHolderErrorLog();
                 this.log.style.backgroundColor = "transparent";
                 this.log.style.opacity = "1"; // reset opacity for future use
-            }, 1000); // wait for 1s before hiding the element
-        }, 3000);
+            }, 1000)); // wait for 1s before hiding the element
+        }, 3000));
     }
 
     // Method animate error log with red background, fade out after few seconds
@@ -174,8 +186,11 @@ export default class SaveProjectElement extends HTMLElement {
         this._showLog(message, "green");
     }
 
+    /** Une question : reste affichée jusqu'à Oui ou Non (un fondu en cours ne l'efface plus). */
     showConfirm(message: string, yesCallback: ()=>void) {
-        this.log.innerHTML = message;
+        this._annulerFondu();
+        this.log.textContent = message;
+        this.log.style.backgroundColor = "#b36b00";
         this.saveProjectButton.style.display = "none";
         this.confirm.style.display = "";
         this.yes.onclick = yesCallback;

@@ -180,7 +180,8 @@ export default class ProjectController {
         }
         else if (response.status === 400 && !override) {
             let json = await response.json();
-            let message = `Project "${project}", last edited : ${json.date}, already exists, do you want to override it?`;
+            let date = json.date ? new Date(json.date).toLocaleString() : "?";
+            let message = `Le projet « ${name} » de ${user} existe déjà (sauvé le ${date}). Le remplacer ?`;
             this._view.saveElement.showConfirm(message, async () => {
                 await this.saveProject(true);
             });
