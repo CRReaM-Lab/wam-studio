@@ -12,6 +12,7 @@ import {
 } from "../../utils/agent-transfert/AgentTransfertHelpers";
 import { creerSocketAgent, type SocketAgent } from "./AgentTransfertConnexion";
 import type { Inventaire, ResultatInventaire } from "../../Views/SearchRaspberryFenetreInventaire";
+import type { AnalyseSon, ResultatAnalyse } from "../../Views/SearchRaspberryApercuSon";
 
 export type ConfigPersisteeAgent = {
   sshHost?: string;
@@ -237,6 +238,24 @@ export default class AgentTransfertClient {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur reseau.";
       return { ok: false, error: message };
+    }
+  }
+
+  /** L'analyse d'un son du Pi (spectre, coupure du module, découpages), gardée par le serveur. */
+  public async analyserSon(sshHost: string, fichier: string): Promise<ResultatAnalyse> {
+    try {
+      const response = await fetch(`${this.agentBaseUrl}/analyse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sshHost, fichier }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.ok !== true) {
+        return { ok: false, error: payload.error || `HTTP ${response.status}` };
+      }
+      return { ok: true, analyse: payload as AnalyseSon };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "Erreur reseau." };
     }
   }
 

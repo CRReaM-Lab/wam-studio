@@ -891,6 +891,7 @@ export default class SearchRaspberryController {
     ouvrirFenetreImportAudio({
       cibles,
       listerSons: (ip) => this.importAudio!.listerSons(ip),
+      analyser: (ip, fichier) => this.agentTransfert.analyserSon(ip, fichier),
       onImporter: async (selection) => {
         const cible = cibles.find((item) => item.ip === selection.ip);
         const nomAffichage = cible?.nomAffichage ?? selection.ip;

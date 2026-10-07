@@ -1,6 +1,12 @@
 import type { CibleImportAudio } from "../Services/RaspberryImportAudioService";
 import { formaterLibelleFichierPlay } from "../utils/osc/OscPlayHelpers";
 import { synchroniserLibellesDepuisFichiers } from "../Services/RaspberryLibellesSonsStore";
+import {
+  dessinerFormeOnde,
+  dessinerSpectrogramme,
+  resumerAnalyse,
+  type ResultatAnalyse,
+} from "./SearchRaspberryApercuSon";
 
 const ID_OVERLAY = "raspberry-import-audio-overlay";
 
@@ -30,7 +36,8 @@ function appliquerStyleModal(modal: HTMLDivElement): void {
   modal.style.padding = "20px";
   modal.style.border = "1px solid #3b4046";
   modal.style.borderRadius = "8px";
-  modal.style.width = "460px";
+  modal.style.width = "660px";
+  modal.style.maxWidth = "95vw";
   modal.style.maxHeight = "80vh";
   modal.style.overflow = "auto";
 }
@@ -46,6 +53,8 @@ export function ouvrirFenetreImportAudio(params: {
   cibles: CibleImportAudio[];
   listerSons: (ip: string) => Promise<{ ok: true; fichiers: string[] } | { ok: false; error: string }>;
   onImporter: (selection: SelectionImportAudio) => Promise<{ ok: boolean; message: string }>;
+  /** L'analyse d'un son du Pi (serveur), pour l'aperçu et les avertissements. */
+  analyser?: (ip: string, fichier: string) => Promise<ResultatAnalyse>;
 }): void {
   fermerOverlay();
 
@@ -139,7 +148,7 @@ export function ouvrirFenetreImportAudio(params: {
   listeSons.style.border = "1px solid #3b4046";
   listeSons.style.borderRadius = "6px";
   listeSons.style.padding = "8px";
-  listeSons.style.maxHeight = "240px";
+  listeSons.style.maxHeight = "360px";
   listeSons.style.overflow = "auto";
   listeSons.style.fontSize = "13px";
   listeSons.innerText = enLigne.length === 0 ? "Aucun Raspberry disponible." : "Chargement...";
@@ -191,9 +200,26 @@ export function ouvrirFenetreImportAudio(params: {
   const lireFichiersCoches = (): string[] =>
     cases.filter((item) => item.checked).map((item) => item.value);
 
+  /* Les analyses, demandées deux à la fois pour ne pas charger le serveur ; une liste
+     rechargée (autre Pi, actualiser) abandonne les demandes de la précédente. */
+  let generation = 0;
+  const apercus: Array<() => Promise<void>> = [];
+  const lancerApercus = (gen: number) => {
+    const suivant = async () => {
+      while (gen === generation && apercus.length > 0) {
+        const tache = apercus.shift()!;
+        await tache();
+      }
+    };
+    void suivant();
+    void suivant();
+  };
+
   const remplirListeSons = (fichiers: string[], ip: string) => {
     listeSons.innerHTML = "";
     cases = [];
+    const gen = ++generation;
+    apercus.length = 0;
     const libelles = synchroniserLibellesDepuisFichiers(ip, fichiers);
 
     if (fichiers.length === 0) {
@@ -204,12 +230,20 @@ export function ouvrirFenetreImportAudio(params: {
     }
 
     for (const nom of fichiers) {
+      const bloc = document.createElement("div");
+      bloc.style.marginBottom = "6px";
+
+      const rangee = document.createElement("div");
+      rangee.style.display = "flex";
+      rangee.style.alignItems = "center";
+      rangee.style.gap = "8px";
+
       const ligne = document.createElement("label");
       ligne.style.display = "flex";
       ligne.style.alignItems = "center";
       ligne.style.gap = "8px";
-      ligne.style.marginBottom = "6px";
       ligne.style.cursor = "pointer";
+      ligne.style.flex = "1";
 
       const caseACocher = document.createElement("input");
       caseACocher.type = "checkbox";
@@ -221,8 +255,66 @@ export function ouvrirFenetreImportAudio(params: {
 
       ligne.appendChild(caseACocher);
       ligne.appendChild(texte);
-      listeSons.appendChild(ligne);
+      rangee.appendChild(ligne);
+
+      // L'aperçu : la forme d'onde colorée par les fréquences ; un clic montre le spectrogramme.
+      const apercu = document.createElement("canvas");
+      apercu.title = "Analyse en cours…";
+      apercu.style.cursor = "pointer";
+      apercu.style.background = "rgba(255,255,255,0.03)";
+      apercu.style.borderRadius = "3px";
+      apercu.width = 180;
+      apercu.height = 30;
+      apercu.style.width = "180px";
+      apercu.style.height = "30px";
+      rangee.appendChild(apercu);
+      bloc.appendChild(rangee);
+
+      const alertes = document.createElement("div");
+      alertes.style.fontSize = "11px";
+      alertes.style.color = "#ffc46b";
+      alertes.style.margin = "2px 0 0 24px";
+      bloc.appendChild(alertes);
+
+      const detail = document.createElement("div");
+      detail.style.display = "none";
+      detail.style.margin = "6px 0 4px 24px";
+      bloc.appendChild(detail);
+      listeSons.appendChild(bloc);
+
+      if (params.analyser) {
+        apercus.push(async () => {
+          const resultat = await params.analyser!(ip, nom);
+          if (gen !== generation) return;
+          if (!resultat.ok) {
+            apercu.title = `Analyse impossible : ${resultat.error}`;
+            alertes.style.color = "#ff9b9b";
+            alertes.innerText = `analyse impossible : ${resultat.error}`;
+            return;
+          }
+          const a = resultat.analyse;
+          dessinerFormeOnde(apercu, a);
+          apercu.title = `${resumerAnalyse(a)}\nCliquer pour le spectrogramme`;
+          alertes.innerText = a.avertissements.join(" · ");
+          apercu.onclick = () => {
+            const ouvert = detail.style.display !== "none";
+            detail.style.display = ouvert ? "none" : "block";
+            if (!ouvert && !detail.firstChild) {
+              const spectre = document.createElement("canvas");
+              dessinerSpectrogramme(spectre, a, 560, 140);
+              spectre.style.borderRadius = "4px";
+              const chiffres = document.createElement("div");
+              chiffres.style.fontSize = "11px";
+              chiffres.style.opacity = "0.8";
+              chiffres.style.marginTop = "3px";
+              chiffres.innerText = resumerAnalyse(a);
+              detail.append(spectre, chiffres);
+            }
+          };
+        });
+      }
     }
+    lancerApercus(gen);
 
     boutonToutCocher.disabled = false;
     boutonToutDecocher.disabled = false;
