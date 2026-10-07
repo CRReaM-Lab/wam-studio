@@ -11,6 +11,7 @@ import {
   validerFormulaireTransfert,
 } from "../../utils/agent-transfert/AgentTransfertHelpers";
 import { creerSocketAgent, type SocketAgent } from "./AgentTransfertConnexion";
+import type { Inventaire, ResultatInventaire } from "../../Views/SearchRaspberryFenetreInventaire";
 
 export type ConfigPersisteeAgent = {
   sshHost?: string;
@@ -236,6 +237,32 @@ export default class AgentTransfertClient {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur reseau.";
       return { ok: false, error: message };
+    }
+  }
+
+  /** L'inventaire des sons des Pi, tel que le serveur l'a lu. */
+  public async lireInventaire(): Promise<ResultatInventaire> {
+    try {
+      const response = await fetch(`${this.agentBaseUrl}/inventaire`);
+      if (!response.ok) return { ok: false, error: `HTTP ${response.status}` };
+      return { ok: true, inventaire: (await response.json()) as Inventaire };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "Erreur reseau." };
+    }
+  }
+
+  /** Fait relire l'inventaire d'un Pi (ou de tous) par le serveur, puis le rend. */
+  public async relireInventaire(sshHost?: string): Promise<ResultatInventaire> {
+    try {
+      const response = await fetch(`${this.agentBaseUrl}/inventaire/rafraichir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sshHost ? { sshHost } : {}),
+      });
+      if (!response.ok) return { ok: false, error: `HTTP ${response.status}` };
+      return { ok: true, inventaire: (await response.json()) as Inventaire };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "Erreur reseau." };
     }
   }
 

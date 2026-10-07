@@ -91,6 +91,7 @@ import {
 import { ouvrirFenetreSuppressionAudio } from "../Views/SearchRaspberryFenetreSuppressionAudio";
 import { ouvrirFenetreImportAudio } from "../Views/SearchRaspberryFenetreImportAudio";
 import { ouvrirMenuRegion } from "../Views/SearchRaspberryMenuRegion";
+import { ouvrirFenetreInventaire } from "../Views/SearchRaspberryFenetreInventaire";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
 import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSequenceurOsc";
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
@@ -161,6 +162,7 @@ export default class SearchRaspberryController {
         onSendAudio: () => this.ouvrirFenetreEnvoiAudio(),
         onImportAudio: () => this.ouvrirFenetreImportAudio(),
         onDeleteAudio: () => this.ouvrirFenetreSuppressionAudio(),
+        onInventaire: () => this.ouvrirFenetreInventaire(),
       });
     ouvrirBoutons();
     window.setTimeout(ouvrirBoutons, 500);
@@ -642,6 +644,20 @@ export default class SearchRaspberryController {
     );
     this.rafraichirPanneauDetailsSiSelectionne(raspberry.ip, { forcer: true });
     logTransfertInfo("Envoi piste liee termine", { ip: raspberry.ip });
+  }
+
+  public ouvrirFenetreInventaire(): void {
+    ouvrirFenetreInventaire({
+      pisConnus: Array.from(this.state.raspberryMap.values())
+        .filter((raspberry) => raspberry.isExpected)
+        .map((raspberry) => ({
+          ip: raspberry.ip,
+          nom: `rasp ${extraireNumeroRaspberryDepuisIp(raspberry.ip) ?? "?"}`,
+          enLigne: raspberry.isOnline,
+        })),
+      charger: () => this.agentTransfert.lireInventaire(),
+      relire: (ip) => this.agentTransfert.relireInventaire(ip),
+    });
   }
 
   /**
