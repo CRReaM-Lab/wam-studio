@@ -56,6 +56,10 @@ export function extraireHorodatageSondageReseauDepuisMessage(value: unknown): nu
     return 0;
   }
   const record = value as Record<string, unknown>;
+  // Serveur de modulePre : l'âge, pour ne pas comparer deux horloges (navigateur et serveur).
+  if (typeof record.checkedAgeMs === "number" && Number.isFinite(record.checkedAgeMs)) {
+    return record.checkedAgeMs < 0 ? 0 : Date.now() - record.checkedAgeMs;
+  }
   const checkedAt = record.checkedAtMs || record.networkCheckedAtMs;
   if (typeof checkedAt === "number" && Number.isFinite(checkedAt)) {
     return checkedAt;
@@ -68,6 +72,10 @@ export function extraireDernierHeartbeatDepuisMessage(value: unknown): number {
     return Date.now();
   }
   const record = value as Record<string, unknown>;
+  // Serveur de modulePre : l'âge du dernier battement, ramené à l'horloge du navigateur.
+  if (typeof record.ageMs === "number" && Number.isFinite(record.ageMs) && record.ageMs >= 0) {
+    return Date.now() - record.ageMs;
+  }
   const lastHeartbeat = record.lastHeartbeatMs || record.lastHeartbeat || record.timestamp;
   if (typeof lastHeartbeat === "number" && Number.isFinite(lastHeartbeat)) {
     return lastHeartbeat;
