@@ -132,6 +132,12 @@ export function importerRegionsSonsPersistes(
   }
 }
 
+/** Le lien région → son d'un projet chargé remplace celui du navigateur (projet d'une autre session). */
+export function remplacerRegionsSons(regionsSons: Record<string, EntreeRegionSonPersiste>): void {
+  ecrireToutes([]);
+  importerRegionsSonsPersistes(regionsSons);
+}
+
 export function trouverSonPourRegion(
   raspberryId: number,
   startMs: number,

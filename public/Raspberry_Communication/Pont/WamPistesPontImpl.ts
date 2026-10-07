@@ -12,6 +12,7 @@ import { formaterNomAfficheSon } from "../utils/osc/NomSonPiste";
 import { lireLibelleSon } from "../Services/RaspberryLibellesSonsStore";
 import { HEIGHT_TRACK, RATIO_MILLS_BY_PX } from "../../src/Env";
 import EditorView from "../../src/Views/Editor/EditorView";
+import { brancherExportRegionsSons } from "../Services/RaspberryProjetRegionsSons";
 import { calculerTempsMsDepuisXCanvas } from "../utils/osc/TempsMarqueurPiste";
 
 /**
@@ -22,6 +23,8 @@ export default class WamPistesPontImpl implements IWamPistesPont {
 
   constructor(private readonly app: App) {
     this.exposerOutilsAudioConsole(this.contexteAudio());
+    // La sauvegarde du projet (src/Loader) emporte le lien région → son du Pi.
+    brancherExportRegionsSons((projet) => this.exporterRegionsSonsDepuisProjet(projet as ProjectData));
   }
 
   public async creerPistePourRaspberry(

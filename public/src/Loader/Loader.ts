@@ -12,6 +12,9 @@ import { raspberryTrackBindingStore } from "../../Raspberry_Communication/Servic
 import { declencherSynchronisationPistesRaspberry } from "../../Raspberry_Communication/Services/RaspberryPisteSynchronisation";
 import { ecrireMarqueursSequenceur, lireMarqueursSequenceur } from "../../Raspberry_Communication/Services/RaspberryMarqueursStore";
 import type { MarqueurSequenceur } from "../../Raspberry_Communication/Models/MarqueurSequenceur";
+import { exporterRegionsSonsProjet } from "../../Raspberry_Communication/Services/RaspberryProjetRegionsSons";
+import { CURRENT_PROJECT_VERSION, metaASauver, migrerProjet, type MetaProjet, type MigrationConsignee } from "./ProjectFormat";
+import { remplacerRegionsSons, type EntreeRegionSonPersiste } from "../../Raspberry_Communication/Services/RaspberryRegionSonStore";
 
 
 /**
@@ -21,7 +24,7 @@ import type { MarqueurSequenceur } from "../../Raspberry_Communication/Models/Ma
  * Increment the major version number when the project format changes in a way that is not backward compatible.
  * Increment the minor version number when the project format changes in a way that is backward but not forward compatible.
  */
-const CURRENT_PROJECT_VERSION: [number,number]=[1,0]
+// La version du format et ses migrations : ProjectFormat.ts (et docs/format-projet.md).
 
 /** Loaders to load regions. */
 const regionLoaders: {
@@ -86,6 +89,10 @@ export interface ProjectData {
     }[];
     /** Marqueurs OSC et cues de la timeline (absents des projets d'avant : on garde ceux du navigateur). */
     marqueurs?: MarqueurSequenceur[];
+    /** Par fichier de région audio : son Pi et son numéro de son (absent des projets d'avant). */
+    regionsSons?: Record<string, EntreeRegionSonPersiste>;
+    /** Création, dernière sauvegarde, et migrations appliquées (depuis la version 1.3). */
+    meta?: MetaProjet;
 }
 
 /**
@@ -99,6 +106,11 @@ export interface RegionContent{
 
 export default class Loader {
     _app: App;
+
+    /** Les métadonnées du projet ouvert, et les migrations faites à son chargement : la
+     *  prochaine sauvegarde les consigne. */
+    private metaChargee: MetaProjet | undefined = undefined;
+    private migrationsAuChargement: MigrationConsignee[] = [];
 
     constructor(app: App) {
         this._app = app;
@@ -183,6 +195,11 @@ export default class Loader {
             tracks: tracks,
             marqueurs: lireMarqueursSequenceur(),
         }
+        project.regionsSons = exporterRegionsSonsProjet(project)
+        project.meta = metaASauver(this.metaChargee, this.migrationsAuChargement)
+        // Consignées une fois : les sauvegardes suivantes repartent de ces métadonnées.
+        this.metaChargee = project.meta
+        this.migrationsAuChargement = []
         console.log("Save Project:",project,contents)
         return [project,contents]
     }
@@ -192,18 +209,17 @@ export default class Loader {
         let project: ProjectData = data;
         console.log("Load Project:", project)
 
-        // Version check
+        // Version : refusé si incompatible, migré pas à pas sinon (ProjectFormat.ts).
         {
-            let error_message=null
-            let version = project.version;
-            if(!Array.isArray(version) || version.length!=2)error_message= `The project version(${version}) is invalid, the project incompatible`
-            else if(version[0]<CURRENT_PROJECT_VERSION[0])error_message= `The project version(${version.join(".")}) is too old`
-            else if(version[0]>CURRENT_PROJECT_VERSION[0])error_message= `The project version(${version.join(".")}) is too recent. Use a more recent version WAMStudio`
-            else if(version[1]>CURRENT_PROJECT_VERSION[1])error_message= `The project version(${version.join(".")}) is too recent. Use a more recent version WAMStudio`
-            if(error_message!=null){
-                alert(`${error_message}. WAM Studio version: ${CURRENT_PROJECT_VERSION.join(".")}`)
+            const migration = migrerProjet(project)
+            if (!migration.ok) {
+                alert(`${migration.erreur}.`)
+                this._app.editorView.setLoading(false)
                 return
             }
+            this.metaChargee = project.meta
+            this.migrationsAuChargement = migration.migrations
+            for (const m of migration.migrations) console.info(`[projet] migration ${m.de} → ${m.vers} : ${m.note}`)
         }
 
         let tracksJson = project.tracks
@@ -213,6 +229,7 @@ export default class Loader {
         // Les marqueurs viennent du projet ; un projet d'avant n'en a pas : ceux du navigateur
         // restent, et partiront avec lui à la prochaine sauvegarde.
         if (Array.isArray(project.marqueurs)) ecrireMarqueursSequenceur(project.marqueurs)
+        if (project.regionsSons && typeof project.regionsSons === "object") remplacerRegionsSons(project.regionsSons)
         this._app.host.playhead = 0
         this._app.host.volume=project.host.volume
         this._app.hostView.tempoSelector.tempo = project.host.tempo
