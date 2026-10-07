@@ -62,14 +62,20 @@ export function demarrerLectureServeur(params: {
   regions: () => EvenementSequenceurOsc[];
 }): void {
   let enLecture = params.pont.lectureEstActive();
+  /* La position de la tête À L'ARRÊT : c'est d'elle que part Play. Lue au moment où l'on
+     s'aperçoit du départ, la tête a déjà avancé (jusqu'à 30 ms) et le serveur sauterait une
+     région qui commence pile à la position de départ (mesuré : « lecture depuis 11 ms »,
+     le /play à 0 ms perdu). */
+  let positionArret = params.pont.lirePlayheadMs();
   window.setInterval(() => {
     const maintenant = params.pont.lectureEstActive();
+    if (!maintenant) positionArret = params.pont.lirePlayheadMs();
     if (maintenant === enLecture) return;
     enLecture = maintenant;
     if (maintenant) {
       params.envoyer({
         type: "programmeLancer",
-        depuisMs: Math.round(params.pont.lirePlayheadMs()),
+        depuisMs: Math.round(positionArret),
         composition: COMPOSITION_SKINI,
         evenements: construireProgrammeServeur(params.regions()),
       });
