@@ -102,6 +102,7 @@ import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingSto
 import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSequenceurOsc";
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
 import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPanneauOscPlay";
+import { installerPanneauPiSon } from "../Views/PanneauPiSon";
 
 /**
  * Contrôleur de la fenêtre Search Raspberry : logique, WebSocket, timers.
@@ -171,6 +172,20 @@ export default class SearchRaspberryController {
         onInventaire: () => this.ouvrirFenetreInventaire(),
         onLot: () => this.ouvrirFenetreLot(),
       });
+    installerPanneauPiSon({
+      onglets: [
+        { nom: "Envoyer", idFenetre: "raspberry-send-audio-overlay", ouvrir: () => this.ouvrirFenetreEnvoiAudio() },
+        { nom: "Importer", idFenetre: "raspberry-import-audio-overlay", ouvrir: () => this.ouvrirFenetreImportAudio() },
+        { nom: "Supprimer", idFenetre: "raspberry-delete-audio-overlay", ouvrir: () => this.ouvrirFenetreSuppressionAudio() },
+        { nom: "Lot", idFenetre: "raspberry-lot-overlay", ouvrir: () => this.ouvrirFenetreLot() },
+        { nom: "Inventaire", idFenetre: "raspberry-inventaire-overlay", ouvrir: () => this.ouvrirFenetreInventaire() },
+        { nom: "Maintenance ↗", ouvrir: () => window.open("/maintenance", "maintenance-modules") },
+      ],
+      resume: () => {
+        const pis = Array.from(this.state.raspberryMap.values()).filter((r) => r.isExpected);
+        return `${pis.filter((r) => r.isOnline).length} en ligne`;
+      },
+    });
     ouvrirBoutons();
     window.setTimeout(ouvrirBoutons, 500);
     const brancherSave = () =>

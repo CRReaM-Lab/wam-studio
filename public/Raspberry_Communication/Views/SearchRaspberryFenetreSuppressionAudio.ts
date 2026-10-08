@@ -2,6 +2,7 @@ import type { CibleSuppressionAudio } from "../Services/RaspberrySuppressionAudi
 import { formaterLibelleFichierPlay } from "../utils/osc/OscPlayHelpers";
 import { synchroniserLibellesDepuisFichiers } from "../Services/RaspberryLibellesSonsStore";
 import { demanderConfirmation } from "./SearchRaspberryConfirmationEnvoi";
+import { monterFenetre } from "./PanneauPiSon";
 
 const ID_OVERLAY = "raspberry-delete-audio-overlay";
 
@@ -299,7 +300,7 @@ export function ouvrirFenetreSuppressionAudio(params: {
       fermerOverlay();
     }
   });
-  document.body.appendChild(overlay);
+  monterFenetre(overlay);
 
   if (enLigne.length > 0) {
     void chargerSons();

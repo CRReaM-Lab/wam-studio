@@ -1,3 +1,4 @@
+import { monterFenetre } from "./PanneauPiSon";
 /**
  * Fenêtre « Inventaire » : les sons présents sur chaque Pi son, composition par composition,
  * avec leur format, ce que Pd jouera mal (fréquence, canaux), et les écarts entre Pi.
@@ -208,6 +209,6 @@ export function ouvrirFenetreInventaire(params: {
   };
 
   corps.appendChild(el("div", "Chargement…", { opacity: "0.8" }));
-  document.body.appendChild(overlay);
+  monterFenetre(overlay);
   void params.charger().then(rendre);
 }

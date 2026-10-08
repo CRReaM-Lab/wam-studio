@@ -7,6 +7,7 @@ import {
   resumerAnalyse,
   type ResultatAnalyse,
 } from "./SearchRaspberryApercuSon";
+import { monterFenetre } from "./PanneauPiSon";
 
 const ID_OVERLAY = "raspberry-import-audio-overlay";
 
@@ -422,7 +423,7 @@ export function ouvrirFenetreImportAudio(params: {
       fermerOverlay();
     }
   });
-  document.body.appendChild(overlay);
+  monterFenetre(overlay);
 
   if (enLigne.length > 0) {
     mettreAJourInfoPiste();

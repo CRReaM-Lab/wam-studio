@@ -10,6 +10,7 @@ import {
   lireOptionsDepuisLigne,
   type LigneEnvoiAudioDom,
 } from "./SearchRaspberryLigneEnvoiAudio";
+import { monterFenetre } from "./PanneauPiSon";
 
 const ID_OVERLAY = "raspberry-send-audio-overlay";
 
@@ -375,5 +376,5 @@ export function ouvrirFenetreEnvoiAudio(params: {
       fermerOverlay();
     }
   });
-  document.body.appendChild(overlay);
+  monterFenetre(overlay);
 }

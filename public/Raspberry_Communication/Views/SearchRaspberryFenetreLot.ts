@@ -10,6 +10,7 @@ import type {
   ResultatPlanLot,
 } from "../Controllers/agent-transfert/AgentTransfertClient";
 import { appliquerStyleModal, appliquerStyleOverlay } from "./SearchRaspberryFenetreImportAudio";
+import { monterFenetre } from "./PanneauPiSon";
 
 const ID_OVERLAY = "raspberry-lot-overlay";
 
@@ -233,5 +234,5 @@ export function ouvrirFenetreLot(params: {
   };
 
   overlay.appendChild(modal);
-  document.body.appendChild(overlay);
+  monterFenetre(overlay);
 }
