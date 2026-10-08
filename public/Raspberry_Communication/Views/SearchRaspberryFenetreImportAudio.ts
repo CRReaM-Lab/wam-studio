@@ -79,18 +79,18 @@ export function ouvrirFenetreImportAudio(params: {
   hint.style.fontSize = "12px";
   hint.style.opacity = "0.8";
   hint.style.marginBottom = "14px";
-  hint.innerText =
-    "Choisissez un Raspberry en ligne, cochez les sons dans sons/, puis importez-les sur la piste WAM liee (ex. rasp 75).";
+  hint.style.marginBottom = "8px";
+  hint.innerText = "Cochez les sons du Pi à importer sur sa piste.";
   modal.appendChild(hint);
 
   const infoPiste = document.createElement("div");
   infoPiste.style.fontSize = "12px";
-  infoPiste.style.marginBottom = "12px";
+  infoPiste.style.marginBottom = "6px";
   infoPiste.style.color = "#9ecbff";
   modal.appendChild(infoPiste);
 
   const ligneRaspberry = document.createElement("div");
-  ligneRaspberry.style.marginBottom = "12px";
+  ligneRaspberry.style.marginBottom = "8px";
 
   const labelRaspberry = document.createElement("label");
   labelRaspberry.style.display = "block";
@@ -153,7 +153,7 @@ export function ouvrirFenetreImportAudio(params: {
   listeSons.style.borderRadius = "6px";
   listeSons.style.padding = "8px";
   listeSons.style.flex = "1 1 auto";
-  listeSons.style.minHeight = "120px";
+  listeSons.style.minHeight = "240px";
   listeSons.style.overflow = "auto";
   listeSons.style.fontSize = "13px";
   listeSons.innerText = enLigne.length === 0 ? "Aucun Raspberry disponible." : "Chargement...";
@@ -161,7 +161,7 @@ export function ouvrirFenetreImportAudio(params: {
 
   const statut = document.createElement("div");
   statut.style.fontSize = "12px";
-  statut.style.margin = "12px 0 4px";
+  statut.style.margin = "8px 0 2px";
   statut.style.minHeight = "18px";
   statut.style.whiteSpace = "pre-wrap";
   modal.appendChild(statut);
@@ -170,7 +170,7 @@ export function ouvrirFenetreImportAudio(params: {
   actions.style.display = "flex";
   actions.style.justifyContent = "flex-end";
   actions.style.gap = "8px";
-  actions.style.marginTop = "14px";
+  actions.style.marginTop = "8px";
 
   const boutonFermer = document.createElement("button");
   boutonFermer.type = "button";
@@ -236,7 +236,8 @@ export function ouvrirFenetreImportAudio(params: {
 
     for (const nom of fichiers) {
       const bloc = document.createElement("div");
-      bloc.style.marginBottom = "6px";
+      bloc.style.padding = "4px 0";
+      bloc.style.borderBottom = "1px solid rgba(255,255,255,0.06)";
 
       const rangee = document.createElement("div");
       rangee.style.display = "flex";
@@ -268,10 +269,11 @@ export function ouvrirFenetreImportAudio(params: {
       apercu.style.cursor = "pointer";
       apercu.style.background = "rgba(255,255,255,0.03)";
       apercu.style.borderRadius = "3px";
-      apercu.width = 180;
-      apercu.height = 30;
-      apercu.style.width = "180px";
-      apercu.style.height = "30px";
+      apercu.width = 140;
+      apercu.height = 26;
+      apercu.style.width = "140px";
+      apercu.style.height = "26px";
+      apercu.style.flex = "0 0 auto";
       rangee.appendChild(apercu);
       bloc.appendChild(rangee);
 
@@ -314,6 +316,7 @@ export function ouvrirFenetreImportAudio(params: {
             if (!ouvert && !detail.firstChild) {
               const spectre = document.createElement("canvas");
               dessinerSpectrogramme(spectre, a, 560, 140);
+              spectre.style.maxWidth = "100%";
               spectre.style.borderRadius = "4px";
               const chiffres = document.createElement("div");
               chiffres.style.fontSize = "11px";

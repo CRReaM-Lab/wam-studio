@@ -98,8 +98,9 @@ html, body {
   background: transparent !important;
 }
 
-/* Scinder est dans la palette d'outils (S) : inutile en double ici. */
-#split-btn { display: none !important; }
+/* Scinder (S) et le repère (M) sont dans la palette d'outils : inutiles en double ici. L'id
+   seul ne suffit pas contre `#menu-bar .menu-item { display: flex !important }`. */
+#menu-bar #split-btn, #menu-bar [data-raspberry-marqueur-piste] { display: none !important; }
 
 /* Le lancement du serveur Raspberry : rouge seulement quand il est arrêté (géré ailleurs) ; ici
    un bouton comme les autres, coins arrondis. */

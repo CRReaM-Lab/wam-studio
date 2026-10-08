@@ -33,10 +33,12 @@ const STYLE = `
   background: transparent; color: #cfd3d8; cursor: pointer; font-size: 18px; }
 #${ID_PANNEAU} .fermer:hover { background: #22262c; }
 #${ID_PANNEAU} nav { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 8px; border-bottom: 1px solid #262a31; }
-#${ID_PANNEAU} nav button { font: inherit; font-size: 14px; color: #9aa1ab; background: transparent; border: 0;
-  border-bottom: 2px solid transparent; padding: 10px 10px; min-height: 44px; cursor: pointer; touch-action: manipulation; }
+#${ID_PANNEAU} nav button { font: inherit; font-size: 13px; color: #9aa1ab; background: transparent; border: 0;
+  border-bottom: 2px solid transparent; padding: 10px 7px; min-height: 44px; cursor: pointer; touch-action: manipulation; }
 #${ID_PANNEAU} nav button[aria-selected="true"] { color: #f2f3f5; border-bottom-color: #6fb6ff; }
 #${ID_PANNEAU} .corps { flex: 1; min-height: 0; overflow: auto; }
+/* Dans le panneau, l'onglet dit déjà quelle fenêtre est ouverte : pas de grand titre. */
+#${ID_PANNEAU} .corps h3 { display: none; }
 #${ID_PANNEAU} .vide { color: #8a929d; padding: 24px 16px; font-size: 14px; }
 #${ID_BOUTON}:not(.outil) { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0 8px; padding: 0 12px;
   border-radius: 8px; border: 1px solid #33496b; background: #1f2a3a; color: #e6e8eb; cursor: pointer;
