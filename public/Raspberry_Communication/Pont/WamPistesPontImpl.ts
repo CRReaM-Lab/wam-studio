@@ -193,12 +193,8 @@ export default class WamPistesPontImpl implements IWamPistesPont {
       }
 
       const x = region.startMs / RATIO_MILLS_BY_PX - viewport.left;
-      const y =
-        waveform.position.y -
-        viewport.top +
-        EditorView.PLAYHEAD_HEIGHT +
-        EditorView.LOOP_HEIGHT +
-        4;
+      // Le haut de la région : `waveform.position.y` compte déjà la règle (boucle + tête de lecture).
+      const y = waveform.position.y - viewport.top;
       const largeurRegion = region.durationMs / RATIO_MILLS_BY_PX;
       const visible =
         x + largeurRegion >= 0 &&

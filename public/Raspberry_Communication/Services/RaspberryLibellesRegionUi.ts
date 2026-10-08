@@ -141,9 +141,9 @@ export function rafraichirLibellesRegionUi(pont: IWamPistesPont): void {
     cadre.style.background =
       etat === "absente" ? "repeating-linear-gradient(135deg, rgba(239,107,93,.22) 0 8px, rgba(239,107,93,.06) 8px 16px)" : "transparent";
     cadre.style.width = `${Math.max(4, Math.round(item.largeur))}px`;
-    cadre.style.height = `${Math.round(item.hauteur - 8)}px`;
+    cadre.style.height = `${Math.round(item.hauteur - 1)}px`;
     cadre.style.display = item.visible ? "block" : "none";
-    cadre.style.transform = `translate(${Math.round(item.x)}px, ${Math.round(item.y - 2)}px)`;
+    cadre.style.transform = `translate(${Math.round(item.x)}px, ${Math.round(item.y)}px)`;
   }
 
   conteneur.querySelectorAll<HTMLDivElement>(`[${ATTR_LIBELLE}]`).forEach((element) => {

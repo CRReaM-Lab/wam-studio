@@ -6,10 +6,11 @@ import { basculerToucheVirtuelle, estToucheVirtuelle } from "../Utils/keys";
  * CRReaM-dev-root, maquette « Arrangeur WAM : propositions », planche 1).
  *
  * - Les gestes de base de REAPER, au doigt comme à la souris : scinder (S), repère (M),
- *   dupliquer (⌘D), copier et coller (⌘C, ⌘V), supprimer (⌫), boucle (R).
- * - Les modes tactiles : un écran tactile n'a ni ⇧ ni ⌘. « Libre » tient un ⇧ virtuel (placer
- *   librement malgré la grille) et « Sélection multiple » un ⌘ virtuel (ajouter à la
- *   sélection) ; le reste de WAM les voit comme de vraies touches.
+ *   dupliquer (⌘D), copier et coller (⌘C, ⌘V), supprimer (⌫). La boucle (R) reste dans la
+ *   barre du haut, avec le transport.
+ * - Le mode tactile : un écran tactile n'a pas de ⌘. « Sélection multiple » tient un ⌘ virtuel
+ *   (ajouter à la sélection) ; le reste de WAM le voit comme une vraie touche. Placer librement
+ *   (⇧ tenu au clavier) se fait au doigt en coupant la grille, dans la barre du haut.
  * - « ? » affiche le nom et le raccourci de chaque outil à côté de son icône (au doigt, pas de
  *   survol) ; le choix est gardé dans le navigateur.
  */
@@ -35,8 +36,6 @@ const ICONES = {
   copier: svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4V5a1 1 0 0 1 1-1h10v1"/>'),
   coller: svg('<path d="M9 4h6v3H9z"/><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>'),
   supprimer: svg('<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>'),
-  boucle: svg('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>'),
-  libre: svg('<path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/>'),
   multiple: svg('<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M13 7h4a2 2 0 0 1 2 2v2M11 17H7a2 2 0 0 1-2-2v-2"/>'),
   aide: svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17.5h.01"/>'),
 };
@@ -88,9 +87,7 @@ export default class PaletteOutilsView {
         { nom: "Coller au curseur", raccourci: "⌘V", icone: ICONES.coller, action: () => r().pasteRegion(true) },
         { nom: "Supprimer", raccourci: "⌫", icone: ICONES.supprimer, action: () => r().deleteSelectedRegion(true) },
       ],
-      [{ nom: "Boucle", raccourci: "R", icone: ICONES.boucle, action: () => this.app.hostController.loop() }],
       [
-        { nom: "Libre (sans grille)", raccourci: "⇧ tenu", icone: ICONES.libre, touche: "Shift" },
         { nom: "Sélection multiple", raccourci: "⌘ tenu", icone: ICONES.multiple, touche: "Meta" },
       ],
     ];

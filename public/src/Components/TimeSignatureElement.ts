@@ -57,7 +57,7 @@ const template = doc/*html*/`
 =  </style>
   <link rel="stylesheet" href="style/theme-composants.css">
   <div class="time-signature-section">
-    <input id="input" value="4/4" id="time-signature" pattern="^([1-9][0-9]*/[1-9][0-9]*)$" maxlength=5> 
+    <input id="input" value="4/4" id="time-signature" pattern="^([1-9]|[12][0-9]|3[0-2])/(1|2|4|8|16|32)$" title="Temps par mesure / valeur du temps (1, 2, 4, 8, 16 ou 32)" maxlength=5> 
     <span id="label">sig</span> 
   </div>
 `;
@@ -66,6 +66,12 @@ const template = doc/*html*/`
  * A custom element that allows the user to select a time signature.
  */
 export default class TimeSignatureElement extends HTMLElement {
+
+  /** Le dénominateur est une valeur de note : une puissance de deux, pas un nombre quelconque. */
+  static readonly DENOMINATEURS = [1, 2, 4, 8, 16, 32];
+
+  /** La dernière signature valide, rétablie quand la saisie n'en est pas une. */
+  private derniere = "4/4";
 
   constructor() {
     super();
@@ -91,7 +97,11 @@ export default class TimeSignatureElement extends HTMLElement {
   }
 
   set timeSignature(value: [number,number]) {
-    this.input.value = Math.max(1,value[0]??1) + "/" + Math.max(1,value[1]??1)
+    const numerateur = Math.min(32, Math.max(1, Math.round(value[0] ?? 4)))
+    // Le dénominateur le plus proche parmi les valeurs de note (7 → 8).
+    const voulu = value[1] ?? 4
+    const denominateur = TimeSignatureElement.DENOMINATEURS.reduce((a, b) => Math.abs(b - voulu) < Math.abs(a - voulu) ? b : a)
+    this.input.value = this.derniere = numerateur + "/" + denominateur
     this.on_change.forEach(f=>f(this.timeSignature))
   }
 
@@ -99,9 +109,9 @@ export default class TimeSignatureElement extends HTMLElement {
   private defineListeners() {
     this.input.addEventListener("change", (event)=> {
       if(!this.input.validity.valid){
-        this.input.value="4/4"
+        this.input.value=this.derniere
       }
-      console.log("change", this.timeSignature)
+      this.derniere=this.input.value
       this.on_change.forEach(f=>f(this.timeSignature))
     })
   }
