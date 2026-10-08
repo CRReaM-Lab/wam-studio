@@ -41,10 +41,26 @@ export type CallbacksTransfertUi = {
   onJournal?: (message: string) => void;
 };
 
+/** Une ligne du plan d'un lot (`POST <agent>/lot/plan`, Lot.fs du serveur). */
+export type LignePlanLot = {
+  fichier: string;
+  son: number | null;
+  pi: number | null;
+  ip: string;
+  destination: string;
+  gravite: "ok" | "attention" | "erreur";
+  messages: string[];
+};
+
+export type ResultatPlanLot =
+  | { ok: true; prets: number; lignes: LignePlanLot[] }
+  | { ok: false; error: string };
+
 export default class AgentTransfertClient {
   private socket: SocketAgent | null = null;
   private transferIdCourant: string | null = null;
   private envoiEnCours = false;
+  private surEvenementCourant: ((event: EvenementTransfertUi) => void) | null = null;
   private erreurSocketDejaTraitee = false;
   private ecouteursDejaBranches = false;
   private attentes: Array<{
@@ -362,6 +378,53 @@ export default class AgentTransfertClient {
       this.callbacks.onErreur(validation.error);
       return { ok: false, error: validation.error };
     }
+    return this.executerEnvoi(
+      fichier,
+      (transferId) => construireEntetesUploadNommage(formulaire, transferId),
+      (transferId) => construireCommandeStartTransfer(formulaire, transferId)
+    );
+  }
+
+  /** Le plan d'un lot `son<son>-<Pi>.wav` : où irait chaque fichier, sans rien envoyer. */
+  public async planifierLot(noms: string[]): Promise<ResultatPlanLot> {
+    try {
+      const response = await fetch(`${this.agentBaseUrl}/lot/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fichiers: noms }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.ok !== true) {
+        return { ok: false, error: payload.error || `HTTP ${response.status}` };
+      }
+      return { ok: true, prets: payload.prets, lignes: payload.lignes as LignePlanLot[] };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "Erreur reseau." };
+    }
+  }
+
+  /**
+   * Un fichier de lot : le serveur relit son nom (`son12-98.wav`) et choisit lui-même le Pi et
+   * le nom sur le Pi. `surEvenement` reçoit les évènements de ce transfert (avertissements…).
+   */
+  public envoyerFichierLot(
+    fichier: File,
+    surEvenement?: (event: EvenementTransfertUi) => void
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    return this.executerEnvoi(
+      fichier,
+      (transferId) => ({ "X-Transfer-Id": transferId }),
+      (transferId) => ({ type: "startTransfer", transferId, lot: true }),
+      surEvenement
+    );
+  }
+
+  private async executerEnvoi(
+    fichier: File,
+    entetes: (transferId: string) => Record<string, string>,
+    commandeDe: (transferId: string) => Record<string, unknown>,
+    surEvenement?: (event: EvenementTransfertUi) => void
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
     await this.connecter();
     if (!this.socket) {
       const erreur = "Connexion WebSocket à l'agent impossible.";
@@ -376,6 +439,7 @@ export default class AgentTransfertClient {
     }
 
     this.envoiEnCours = true;
+    this.surEvenementCourant = surEvenement ?? null;
     this.erreurSocketDejaTraitee = false;
     this.transferIdCourant = crypto.randomUUID();
     const transferId = this.transferIdCourant;
@@ -385,14 +449,14 @@ export default class AgentTransfertClient {
     try {
       this.presenterEvenement({ transferId, type: "state", state: "RECEIVING" });
       this.journal("Upload HTTP en cours...");
-      await this.uploadFichier(fichier, transferId, formulaire);
+      await this.uploadFichier(fichier, entetes(transferId));
       this.presenterEvenement({
         transferId,
         type: "state",
         state: "READY",
       });
 
-      const commande = construireCommandeStartTransfer(formulaire, transferId);
+      const commande = commandeDe(transferId);
       logTransfertInfo("Envoi startTransfer", commande);
       const finPromise = this.attendreEvenement(
         (event) =>
@@ -435,6 +499,7 @@ export default class AgentTransfertClient {
       return { ok: false, error: message };
     } finally {
       this.envoiEnCours = false;
+      this.surEvenementCourant = null;
       this.transferIdCourant = null;
       logTransfertInfo("Flux transfert libere (pret pour un nouvel envoi)");
     }
@@ -456,15 +521,10 @@ export default class AgentTransfertClient {
     this.socket.emit("subscribe", { transferId: this.transferIdCourant });
   }
 
-  private async uploadFichier(
-    fichier: File,
-    transferId: string,
-    formulaire: TransfertFormulaire
-  ): Promise<void> {
+  private async uploadFichier(fichier: File, entetes: Record<string, string>): Promise<void> {
     const form = new FormData();
     form.append("file", fichier);
-    const entetes = construireEntetesUploadNommage(formulaire, transferId);
-    logTransfertInfo("Upload HTTP", { transferId, entetes, fichier: fichier.name });
+    logTransfertInfo("Upload HTTP", { entetes, fichier: fichier.name });
     const response = await fetch(`${this.agentBaseUrl}/upload`, {
       method: "POST",
       headers: entetes,
@@ -535,6 +595,7 @@ export default class AgentTransfertClient {
 
   private presenterEvenement(event: EvenementTransfertUi): void {
     this.callbacks.onEvenement(event);
+    this.surEvenementCourant?.(event);
     const restantes: typeof this.attentes = [];
     for (const attente of this.attentes) {
       if (this.transferIdCourant && event.transferId && event.transferId !== this.transferIdCourant) {

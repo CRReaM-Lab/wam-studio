@@ -20,7 +20,7 @@ function fermerOverlay(): void {
   document.getElementById(ID_OVERLAY)?.remove();
 }
 
-function appliquerStyleOverlay(overlay: HTMLDivElement): void {
+export function appliquerStyleOverlay(overlay: HTMLDivElement): void {
   overlay.style.position = "fixed";
   overlay.style.inset = "0";
   overlay.style.background = "rgba(0, 0, 0, 0.45)";
@@ -30,7 +30,7 @@ function appliquerStyleOverlay(overlay: HTMLDivElement): void {
   overlay.style.justifyContent = "center";
 }
 
-function appliquerStyleModal(modal: HTMLDivElement): void {
+export function appliquerStyleModal(modal: HTMLDivElement): void {
   modal.style.background = "#1f252b";
   modal.style.color = "#f1f1f1";
   modal.style.padding = "20px";

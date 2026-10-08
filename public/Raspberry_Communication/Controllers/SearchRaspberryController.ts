@@ -97,6 +97,7 @@ import { ecrireCueEnAttente, lireCueEnAttente } from "../Services/RaspberryMarqu
 import { lireMarqueursSequenceur } from "../Services/RaspberryMarqueursStore";
 import { actualiserBandeauCuePiste } from "../Services/RaspberryMarqueursPisteUi";
 import { ouvrirFenetreInventaire } from "../Views/SearchRaspberryFenetreInventaire";
+import { ouvrirFenetreLot } from "../Views/SearchRaspberryFenetreLot";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
 import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSequenceurOsc";
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
@@ -168,6 +169,7 @@ export default class SearchRaspberryController {
         onImportAudio: () => this.ouvrirFenetreImportAudio(),
         onDeleteAudio: () => this.ouvrirFenetreSuppressionAudio(),
         onInventaire: () => this.ouvrirFenetreInventaire(),
+        onLot: () => this.ouvrirFenetreLot(),
       });
     ouvrirBoutons();
     window.setTimeout(ouvrirBoutons, 500);
@@ -684,6 +686,14 @@ export default class SearchRaspberryController {
     );
     this.rafraichirPanneauDetailsSiSelectionne(raspberry.ip, { forcer: true });
     logTransfertInfo("Envoi piste liee termine", { ip: raspberry.ip });
+  }
+
+  /** Un lot de sons nommés son<son>-<Pi>.wav : le serveur dit où va chacun, puis on envoie. */
+  public ouvrirFenetreLot(): void {
+    ouvrirFenetreLot({
+      planifier: (noms) => this.agentTransfert.planifierLot(noms),
+      envoyer: (fichier, surEvenement) => this.agentTransfert.envoyerFichierLot(fichier, surEvenement),
+    });
   }
 
   public ouvrirFenetreInventaire(): void {

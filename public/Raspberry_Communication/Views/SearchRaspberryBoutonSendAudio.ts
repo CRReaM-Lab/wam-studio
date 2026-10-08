@@ -2,6 +2,7 @@ const ATTR_BOUTON_SEND_AUDIO = "data-raspberry-send-audio";
 const ATTR_BOUTON_DELETE_AUDIO = "data-raspberry-delete-audio";
 const ATTR_BOUTON_IMPORT_AUDIO = "data-raspberry-import-audio";
 const ATTR_BOUTON_INVENTAIRE = "data-raspberry-inventaire";
+const ATTR_BOUTON_LOT = "data-raspberry-lot";
 const ATTR_CONTENEUR_BOUTONS = "data-raspberry-audio-buttons";
 
 function texteBouton(element: Element): string {
@@ -46,9 +47,16 @@ export function brancherBoutonsAudio(params: {
   onDeleteAudio: () => void;
   onImportAudio: () => void;
   onInventaire?: () => void;
+  onLot?: () => void;
 }): void {
   const conteneurExistant = document.querySelector(`[${ATTR_CONTENEUR_BOUTONS}]`);
   if (conteneurExistant instanceof HTMLElement) {
+    if (params.onLot && !conteneurExistant.querySelector(`[${ATTR_BOUTON_LOT}]`)) {
+      const modele = conteneurExistant.querySelector(`[${ATTR_BOUTON_SEND_AUDIO}]`);
+      if (modele instanceof HTMLElement) {
+        conteneurExistant.appendChild(creerBoutonAudio(modele, ATTR_BOUTON_LOT, "Lot", params.onLot));
+      }
+    }
     if (params.onInventaire && !conteneurExistant.querySelector(`[${ATTR_BOUTON_INVENTAIRE}]`)) {
       const modele = conteneurExistant.querySelector(`[${ATTR_BOUTON_SEND_AUDIO}]`);
       if (modele instanceof HTMLElement) {
@@ -93,6 +101,9 @@ export function brancherBoutonsAudio(params: {
     conteneur.appendChild(
       creerBoutonAudio(bouton, ATTR_BOUTON_INVENTAIRE, "Inventaire", params.onInventaire)
     );
+  }
+  if (params.onLot) {
+    conteneur.appendChild(creerBoutonAudio(bouton, ATTR_BOUTON_LOT, "Lot", params.onLot));
   }
 
   bouton.replaceWith(conteneur);
