@@ -47,6 +47,8 @@ export interface IWamPistesPont {
   listerRegionsAudioPiste(trackId: number): RegionAudioPiste[];
 
   listerPositionsLibellesRegions(): PositionLibelleRegion[];
+  /** Donne sa couleur à une piste (la couleur de la section de son Pi). */
+  colorerPiste(trackId: number, couleur: string): void;
 
   lirePlayheadMs(): number;
 
@@ -128,15 +130,26 @@ export type RegionPisteRaspberry = {
   sonNumber: number | null;
   nomFichier: string;
   nomAffiche: string;
+  /** La durée de la région quand son son a été envoyé (lien région → son) ; absent : jamais envoyé. */
+  dureeEnvoyeeMs?: number;
 };
 
 export type PositionLibelleRegion = {
   trackId: number;
   regionId: number;
+  /** Le nom du son ; « son ? » pour une région jamais envoyée. */
   nomAffiche: string;
   x: number;
   y: number;
+  /** La place de la région à l'écran (px), pour l'encadrer selon son état d'envoi. */
+  largeur: number;
+  hauteur: number;
   visible: boolean;
+  raspberryId: number;
+  sonNumber: number | null;
+  nomFichier: string;
+  durationMs: number;
+  dureeEnvoyeeMs?: number;
 };
 
 export type PositionMarqueurPiste = {

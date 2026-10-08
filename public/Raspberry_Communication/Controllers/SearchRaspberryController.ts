@@ -103,6 +103,8 @@ import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSeque
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
 import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPanneauOscPlay";
 import { installerPanneauPiSon } from "../Views/PanneauPiSon";
+import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
+import { couleurSection, suivreEtatsEnvoi } from "../Services/RaspberryEtatEnvoiRegions";
 
 /**
  * Contrôleur de la fenêtre Search Raspberry : logique, WebSocket, timers.
@@ -172,6 +174,20 @@ export default class SearchRaspberryController {
         onInventaire: () => this.ouvrirFenetreInventaire(),
         onLot: () => this.ouvrirFenetreLot(),
       });
+    // L'état d'envoi des régions (inventaire du serveur) et la couleur des sections.
+    suivreEtatsEnvoi({
+      lireInventaire: () => this.agentTransfert.lireInventaire(),
+      apres: () => {
+        const pont = this.pontPistes;
+        if (!pont) return;
+        // Chaque piste rasp prend la couleur de la section de son Pi, régions ou pas.
+        for (const binding of raspberryTrackBindingStore.tous()) {
+          const couleur = binding.liee === false ? null : couleurSection(binding.raspberryIp);
+          if (couleur) pont.colorerPiste(binding.trackId, couleur);
+        }
+        rafraichirLibellesRegionUi(pont);
+      },
+    });
     installerPanneauPiSon({
       onglets: [
         { nom: "Envoyer", idFenetre: "raspberry-send-audio-overlay", ouvrir: () => this.ouvrirFenetreEnvoiAudio() },

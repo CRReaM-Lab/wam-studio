@@ -164,6 +164,7 @@ export default class WamPistesPontImpl implements IWamPistesPont {
               meta?.nomAffiche,
             sonNumber: meta?.sonNumber,
           }),
+          dureeEnvoyeeMs: meta?.durationMs,
         });
       }
     }
@@ -186,7 +187,8 @@ export default class WamPistesPontImpl implements IWamPistesPont {
 
     for (const region of regions) {
       const waveform = this.app.editorView.getWaveFormViewById(region.trackId);
-      if (!waveform || !region.nomAffiche || region.nomAffiche === "son ?") {
+      // Toutes les régions des pistes rasp, envoyées ou non : l'étiquette dit leur état d'envoi.
+      if (!waveform) {
         continue;
       }
 
@@ -210,11 +212,23 @@ export default class WamPistesPontImpl implements IWamPistesPont {
         nomAffiche: region.nomAffiche,
         x,
         y,
+        largeur: largeurRegion,
+        hauteur: HEIGHT_TRACK,
         visible,
+        raspberryId: region.raspberryId,
+        sonNumber: region.sonNumber,
+        nomFichier: region.nomFichier,
+        durationMs: region.durationMs,
+        dureeEnvoyeeMs: region.dureeEnvoyeeMs,
       });
     }
 
     return resultat;
+  }
+
+  public colorerPiste(trackId: number, couleur: string): void {
+    const track = this.app.tracksController.getTrackById(trackId);
+    if (track && track.color !== couleur) this.app.tracksController.setColor(track, couleur);
   }
 
   public lirePlayheadMs(): number {
