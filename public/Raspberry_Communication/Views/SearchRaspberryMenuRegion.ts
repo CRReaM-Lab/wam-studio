@@ -162,6 +162,12 @@ export function ouvrirMenuRegion(x: number, y: number, menu: MenuRegion): void {
       annuler.disabled = false;
       statut.style.color = resultat.ok ? "#9be29b" : "#ff9b9b";
       statut.innerText = resultat.message;
+      // Un échec ne fige pas la boîte : on peut corriger (clé posée, autre numéro) et réessayer.
+      if (!resultat.ok) {
+        champ.disabled = false;
+        envoyer.innerText = "Réessayer";
+        decrire();
+      }
     };
 
     void menu.proposer().then((proposition) => {
