@@ -65,6 +65,11 @@ export function noterSections(modules: { ip: string; section: string }[]): void 
   sectionsParIp = new Map(modules.filter((m) => m.section).map((m) => [m.ip, m.section]));
 }
 
+/** La section d'un Pi (parc, via la maintenance) ; null : réserve ou inconnue. */
+export function sectionDe(ip: string): string | null {
+  return sectionsParIp.get(ip) ?? null;
+}
+
 /** La couleur de la section d'un Pi ; aucune pour un Pi sans section (réserve). */
 export function couleurSection(ip: string): string | null {
   const section = sectionsParIp.get(ip);

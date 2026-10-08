@@ -210,5 +210,6 @@ export function installerPanneauPiSon(params: { onglets: Onglet[]; resume: () =>
   } catch {
     /* stockage indisponible */
   }
-  if (ouvert) ouvrirPanneau();
+  // Rouvert au chargement : attendre que la zone du bas ait sa taille, pour savoir la replier.
+  if (ouvert) window.setTimeout(ouvrirPanneau, 800);
 }

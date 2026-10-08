@@ -17,7 +17,13 @@ export default class SearchRaspberryFeature {
     this.controller.initialiser();
   }
 
+  /** Le bouton de la barre du haut : l'onglet OSC du panneau Pi son (l'ancienne fenêtre reste
+   *  joignable par ouvrirAncienneFenetre). */
   public openWindow(): void {
+    this.controller.ouvrirOngletOsc();
+  }
+
+  public ouvrirAncienneFenetre(): void {
     this.controller.ouvrirFenetre();
   }
 

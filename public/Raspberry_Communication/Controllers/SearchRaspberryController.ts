@@ -103,9 +103,10 @@ import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSeque
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
 import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPanneauOscPlay";
 import { installerPanneauPiSon } from "../Views/PanneauPiSon";
+import { ouvrirOngletOsc } from "../Views/SearchRaspberryFenetreOsc";
 import { extraireNumeroSonOscDepuisFichier, OSC_PLAY_NIVEAU_DEFAUT } from "../utils/osc/OscPlayHelpers";
 import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
-import { couleurSection, suivreEtatsEnvoi } from "../Services/RaspberryEtatEnvoiRegions";
+import { couleurSection, sectionDe, suivreEtatsEnvoi } from "../Services/RaspberryEtatEnvoiRegions";
 
 /**
  * Contrôleur de la fenêtre Search Raspberry : logique, WebSocket, timers.
@@ -193,6 +194,7 @@ export default class SearchRaspberryController {
       onglets: [
         { nom: "Envoyer", idFenetre: "raspberry-send-audio-overlay", ouvrir: () => this.ouvrirFenetreEnvoiAudio() },
         { nom: "Sons du Pi", idFenetre: "raspberry-import-audio-overlay", ouvrir: () => this.ouvrirFenetreImportAudio() },
+        { nom: "OSC", idFenetre: "raspberry-osc-overlay", ouvrir: () => this.ouvrirOngletOsc() },
         { nom: "Lot", idFenetre: "raspberry-lot-overlay", ouvrir: () => this.ouvrirFenetreLot() },
         { nom: "Inventaire", idFenetre: "raspberry-inventaire-overlay", ouvrir: () => this.ouvrirFenetreInventaire() },
         { nom: "Maintenance ↗", ouvrir: () => window.open("/maintenance", "maintenance-modules") },
@@ -978,6 +980,19 @@ export default class SearchRaspberryController {
           this.rafraichirPanneauDetailsSiSelectionne(selection.ip, { forcer: true });
         }
         return { ok: resultat.ok, message: `${resultat.nomAffichage} : ${resultat.message}` };
+  }
+
+  /** L'onglet OSC du panneau : une commande vers un Pi, une section ou tous les Pi en ligne. */
+  public ouvrirOngletOsc(): void {
+    this.state.refreshOnlineStateFromHeartbeat();
+    ouvrirOngletOsc({
+      lirePis: () =>
+        Array.from(this.state.raspberryMap.values())
+          .filter((r) => r.isExpected)
+          .sort((a, b) => Number(a.ip.split(".").pop()) - Number(b.ip.split(".").pop()))
+          .map((r) => ({ ip: r.ip, nom: formaterNomAffichageRaspberry(r.ip, r.info), enLigne: r.isOnline, section: sectionDe(r.ip) })),
+      envoyer: (ip, adresse, valeur) => this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: adresse, OSCValue: valeur }),
+    });
   }
 
   public ouvrirFenetreImportAudio(): void {
