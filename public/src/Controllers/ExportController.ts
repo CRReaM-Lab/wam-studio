@@ -172,20 +172,40 @@ export default class ExporterController {
     }
 
     /**
-     * Une région passée par toute la chaîne de sa piste (effets compris), sur sa seule durée :
-     * le son « avec l'effet appliqué » qu'on envoie à un Pi. La queue d'un effet (réverbération)
-     * au-delà de la fin de la région est coupée.
+     * Une région passée par toute la chaîne de sa piste (effets compris) : le son « avec l'effet
+     * appliqué » qu'on envoie à un Pi. Le rendu continue après la fin de la région, le temps que
+     * la queue de l'effet (réverbération, écho) s'éteigne (au plus QUEUE_MAX_S), puis le silence
+     * final est retiré ; le son garde au moins la durée de la région.
      */
     public async exportRegionAvecEffetsToWaveBlob(track: Track, startMs: number, durationMs: number): Promise<Blob> {
+        const QUEUE_MAX_S = 8
+        /** En dessous (−80 dBFS), la queue est tenue pour éteinte. */
+        const SEUIL = 1e-4
+        const sr = audioCtx.sampleRate
+        const duree = Math.max(1, Math.round(sr * durationMs / 1000))
         const { default: initializeWamHost } = await import("@webaudiomodules/sdk/src/initializeWamHost");
-        const offlineCtx = new OfflineAudioContext(2, Math.max(1, Math.round(audioCtx.sampleRate * durationMs / 1000)), audioCtx.sampleRate)
+        const offlineCtx = new OfflineAudioContext(2, duree + Math.round(sr * QUEUE_MAX_S), sr)
         const [hostGroupId] = await initializeWamHost(offlineCtx)
         const graph = await track.track_graph.instantiate(offlineCtx, hostGroupId)
         graph.connect(offlineCtx.destination)
         await graph.playEfficiently(startMs, durationMs)
         const rendu = await offlineCtx.startRendering()
         await graph.dispose()
-        return bufferToWave(rendu)
+
+        // La fin : le dernier échantillon audible (tous canaux), plus 50 ms ; jamais avant la région.
+        let dernier = 0
+        for (let c = 0; c < rendu.numberOfChannels; c++) {
+            const d = rendu.getChannelData(c)
+            for (let i = d.length - 1; i > dernier; i--) {
+                if (Math.abs(d[i]) > SEUIL) { dernier = i; break }
+            }
+        }
+        const longueur = Math.min(rendu.length, Math.max(duree, dernier + Math.round(sr * 0.05)))
+        const coupe = new AudioBuffer({ numberOfChannels: rendu.numberOfChannels, length: longueur, sampleRate: sr })
+        for (let c = 0; c < rendu.numberOfChannels; c++) {
+            coupe.copyToChannel(rendu.getChannelData(c).subarray(0, longueur), c)
+        }
+        return bufferToWave(coupe)
     }
 
     /**
