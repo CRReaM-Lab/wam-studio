@@ -3,6 +3,10 @@ const ATTR_BOUTON_DELETE_AUDIO = "data-raspberry-delete-audio";
 const ATTR_BOUTON_IMPORT_AUDIO = "data-raspberry-import-audio";
 const ATTR_BOUTON_INVENTAIRE = "data-raspberry-inventaire";
 const ATTR_BOUTON_LOT = "data-raspberry-lot";
+const ATTR_BOUTON_MAINTENANCE = "data-raspberry-maintenance";
+
+/** La page de maintenance des Pi son, servie par le même serveur que WAM. */
+const ouvrirMaintenance = () => window.open("/maintenance", "maintenance-modules");
 const ATTR_CONTENEUR_BOUTONS = "data-raspberry-audio-buttons";
 
 function texteBouton(element: Element): string {
@@ -51,6 +55,12 @@ export function brancherBoutonsAudio(params: {
 }): void {
   const conteneurExistant = document.querySelector(`[${ATTR_CONTENEUR_BOUTONS}]`);
   if (conteneurExistant instanceof HTMLElement) {
+    if (!conteneurExistant.querySelector(`[${ATTR_BOUTON_MAINTENANCE}]`)) {
+      const modele = conteneurExistant.querySelector(`[${ATTR_BOUTON_SEND_AUDIO}]`);
+      if (modele instanceof HTMLElement) {
+        conteneurExistant.appendChild(creerBoutonAudio(modele, ATTR_BOUTON_MAINTENANCE, "Maintenance", ouvrirMaintenance));
+      }
+    }
     if (params.onLot && !conteneurExistant.querySelector(`[${ATTR_BOUTON_LOT}]`)) {
       const modele = conteneurExistant.querySelector(`[${ATTR_BOUTON_SEND_AUDIO}]`);
       if (modele instanceof HTMLElement) {
@@ -105,6 +115,7 @@ export function brancherBoutonsAudio(params: {
   if (params.onLot) {
     conteneur.appendChild(creerBoutonAudio(bouton, ATTR_BOUTON_LOT, "Lot", params.onLot));
   }
+  conteneur.appendChild(creerBoutonAudio(bouton, ATTR_BOUTON_MAINTENANCE, "Maintenance", ouvrirMaintenance));
 
   bouton.replaceWith(conteneur);
 }
