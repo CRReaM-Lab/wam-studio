@@ -38,7 +38,7 @@ const STYLE = `
 #${ID_PANNEAU} nav button[aria-selected="true"] { color: #f2f3f5; border-bottom-color: #6fb6ff; }
 #${ID_PANNEAU} .corps { flex: 1; min-height: 0; overflow: auto; }
 /* Dans le panneau, l'onglet dit déjà quelle fenêtre est ouverte : pas de grand titre. */
-#${ID_PANNEAU} .corps h3 { display: none; }
+#${ID_PANNEAU} .corps h3, #${ID_PANNEAU} .corps .fermer-fenetre { display: none; }
 #${ID_PANNEAU} .vide { color: #8a929d; padding: 24px 16px; font-size: 14px; }
 #${ID_BOUTON}:not(.outil) { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0 8px; padding: 0 12px;
   border-radius: 8px; border: 1px solid #33496b; background: #1f2a3a; color: #e6e8eb; cursor: pointer;
@@ -75,11 +75,27 @@ function videSiRien(): void {
   }
 }
 
+/** La zone du bas (piste maître, plugins) repliée par le panneau, à rouvrir à sa fermeture. */
+let basReplie = false;
+
+/** La zone du bas est-elle dépliée ? Sa hauteur le dit (l'icône de la flèche ment au démarrage). */
+function zoneDuBasOuverte(): boolean {
+  return (document.getElementById("plugin-editor")?.getBoundingClientRect().height ?? 0) > 60;
+}
+
+/** Replie ou rouvre la zone du bas avec sa propre flèche (`#min-max-btn`). */
+function zoneDuBas(ouverte: boolean): void {
+  if (zoneDuBasOuverte() !== ouverte) document.getElementById("min-max-btn")?.click();
+}
+
 export function ouvrirPanneau(): void {
   const p = panneau();
   if (!p || p.classList.contains("ouvert")) return;
   p.classList.add("ouvert");
   memoriser(true);
+  // Le panneau a besoin de hauteur : la zone du bas se replie le temps qu'il est ouvert.
+  basReplie = zoneDuBasOuverte();
+  if (basReplie) zoneDuBas(false);
   // L'arrangeur a perdu de la largeur : il se recalcule.
   window.dispatchEvent(new Event("resize"));
 }
@@ -89,6 +105,8 @@ export function fermerPanneau(): void {
   if (!p || !p.classList.contains("ouvert")) return;
   p.classList.remove("ouvert");
   memoriser(false);
+  if (basReplie) zoneDuBas(true);
+  basReplie = false;
   window.dispatchEvent(new Event("resize"));
 }
 

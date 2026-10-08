@@ -103,6 +103,7 @@ import { ouvrirFenetreSequenceurOsc } from "../Views/SearchRaspberryFenetreSeque
 import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscService";
 import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPanneauOscPlay";
 import { installerPanneauPiSon } from "../Views/PanneauPiSon";
+import { extraireNumeroSonOscDepuisFichier, OSC_PLAY_NIVEAU_DEFAUT } from "../utils/osc/OscPlayHelpers";
 import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
 import { couleurSection, suivreEtatsEnvoi } from "../Services/RaspberryEtatEnvoiRegions";
 
@@ -191,8 +192,7 @@ export default class SearchRaspberryController {
     installerPanneauPiSon({
       onglets: [
         { nom: "Envoyer", idFenetre: "raspberry-send-audio-overlay", ouvrir: () => this.ouvrirFenetreEnvoiAudio() },
-        { nom: "Importer", idFenetre: "raspberry-import-audio-overlay", ouvrir: () => this.ouvrirFenetreImportAudio() },
-        { nom: "Supprimer", idFenetre: "raspberry-delete-audio-overlay", ouvrir: () => this.ouvrirFenetreSuppressionAudio() },
+        { nom: "Sons du Pi", idFenetre: "raspberry-import-audio-overlay", ouvrir: () => this.ouvrirFenetreImportAudio() },
         { nom: "Lot", idFenetre: "raspberry-lot-overlay", ouvrir: () => this.ouvrirFenetreLot() },
         { nom: "Inventaire", idFenetre: "raspberry-inventaire-overlay", ouvrir: () => this.ouvrirFenetreInventaire() },
         { nom: "Maintenance ↗", ouvrir: () => window.open("/maintenance", "maintenance-modules") },
@@ -897,7 +897,15 @@ export default class SearchRaspberryController {
     ouvrirFenetreSuppressionAudio({
       cibles,
       listerSons: (ip) => this.suppressionAudio.listerSons(ip),
-      onSupprimer: async (selection) => {
+      onSupprimer: (selection) => this.supprimerSonsDuPi(selection, cibles),
+    });
+  }
+
+  /** Supprime des sons d'un Pi, et oublie leurs libellés et le cache de la liste. */
+  private async supprimerSonsDuPi(
+    selection: { ip: string; fichiers: string[] },
+    cibles: { ip: string; nomAffichage: string }[]
+  ): Promise<{ ok: boolean; message: string }> {
         const cible = cibles.find((item) => item.ip === selection.ip);
         const nomAffichage = cible?.nomAffichage ?? selection.ip;
         const sante = await this.agentTransfert.verifierSante();
@@ -918,8 +926,6 @@ export default class SearchRaspberryController {
           this.rafraichirPanneauDetailsSiSelectionne(selection.ip, { forcer: true });
         }
         return { ok: resultat.ok, message: `${resultat.nomAffichage} : ${resultat.message}` };
-      },
-    });
   }
 
   public ouvrirFenetreImportAudio(): void {
@@ -933,6 +939,19 @@ export default class SearchRaspberryController {
       cibles,
       listerSons: (ip) => this.importAudio!.listerSons(ip),
       analyser: (ip, fichier) => this.agentTransfert.analyserSon(ip, fichier),
+      onSupprimer: (selection) => this.supprimerSonsDuPi(selection, cibles),
+      telecharger: (ip, fichier) => this.agentTransfert.telechargerFichierSonSurPi(ip, fichier),
+      jouerSurPi: (ip, fichier) => {
+        const numero = extraireNumeroSonOscDepuisFichier(fichier);
+        if (numero === null) return null;
+        const envoye = this.envoyerMessage({
+          type: "sendOSCmessage",
+          raspIP: ip,
+          OSCMessage: "/play",
+          OSCValue: `${numero} ${OSC_PLAY_NIVEAU_DEFAUT}`,
+        });
+        return envoye ? `/play ${numero} ${OSC_PLAY_NIVEAU_DEFAUT} → ${ip}` : "WebSocket du serveur non connecté : /play non envoyé.";
+      },
       onImporter: async (selection) => {
         const cible = cibles.find((item) => item.ip === selection.ip);
         const nomAffichage = cible?.nomAffichage ?? selection.ip;

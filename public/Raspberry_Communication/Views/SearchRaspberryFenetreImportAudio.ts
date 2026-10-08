@@ -8,6 +8,7 @@ import {
   type ResultatAnalyse,
 } from "./SearchRaspberryApercuSon";
 import { monterFenetre } from "./PanneauPiSon";
+import { demanderConfirmation } from "./SearchRaspberryConfirmationEnvoi";
 
 const ID_OVERLAY = "raspberry-import-audio-overlay";
 
@@ -50,8 +51,22 @@ function lireCibleParIp(cibles: CibleImportAudio[], ip: string): CibleImportAudi
   return cibles.find((cible) => cible.ip === ip);
 }
 
+/** Un seul lecteur pour les écoutes : en lancer une arrête la précédente. */
+let lecteur: { audio: HTMLAudioElement; cle: string; bouton: HTMLButtonElement } | null = null;
+
+function arreterEcoute(): void {
+  if (!lecteur) return;
+  lecteur.audio.pause();
+  URL.revokeObjectURL(lecteur.audio.src);
+  lecteur.bouton.textContent = "▶";
+  lecteur.bouton.setAttribute("aria-pressed", "false");
+  lecteur = null;
+}
+
 /**
- * Fenetre pour importer des sons depuis sons/ sur un Pi vers la piste WAM liee.
+ * Les sons d'un Pi (dossier sons/ de skini), dans un seul éditeur : les écouter (dans le
+ * navigateur, ou joués par le module), les importer sur la piste WAM liée, les supprimer.
+ * Les commandes tiennent en une barre en haut et une en bas : la liste prend le reste.
  */
 export function ouvrirFenetreImportAudio(params: {
   cibles: CibleImportAudio[];
@@ -59,6 +74,12 @@ export function ouvrirFenetreImportAudio(params: {
   onImporter: (selection: SelectionImportAudio) => Promise<{ ok: boolean; message: string }>;
   /** L'analyse d'un son du Pi (serveur), pour l'aperçu et les avertissements. */
   analyser?: (ip: string, fichier: string) => Promise<ResultatAnalyse>;
+  /** Supprimer des sons du Pi ; absent : pas de bouton Supprimer. */
+  onSupprimer?: (selection: { ip: string; fichiers: string[] }) => Promise<{ ok: boolean; message: string }>;
+  /** Le fichier du Pi, pour l'écouter ici. */
+  telecharger?: (ip: string, fichier: string) => Promise<{ ok: true; blob: Blob } | { ok: false; error: string }>;
+  /** Faire jouer le son par le module (`/play`) ; null : le fichier n'a pas de numéro skini. */
+  jouerSurPi?: (ip: string, fichier: string) => string | null;
 }): void {
   fermerOverlay();
 
@@ -72,34 +93,13 @@ export function ouvrirFenetreImportAudio(params: {
 
   const titre = document.createElement("h3");
   titre.style.margin = "0 0 8px";
-  titre.innerText = "Import Audio";
+  titre.innerText = "Sons du Pi";
   modal.appendChild(titre);
 
-  const hint = document.createElement("div");
-  hint.style.fontSize = "12px";
-  hint.style.opacity = "0.8";
-  hint.style.marginBottom = "14px";
-  hint.style.marginBottom = "8px";
-  hint.innerText = "Cochez les sons du Pi à importer sur sa piste.";
-  modal.appendChild(hint);
-
-  const infoPiste = document.createElement("div");
-  infoPiste.style.fontSize = "12px";
-  infoPiste.style.marginBottom = "6px";
-  infoPiste.style.color = "#9ecbff";
-  modal.appendChild(infoPiste);
-
-  const ligneRaspberry = document.createElement("div");
-  ligneRaspberry.style.marginBottom = "8px";
-
-  const labelRaspberry = document.createElement("label");
-  labelRaspberry.style.display = "block";
-  labelRaspberry.style.fontSize = "12px";
-  labelRaspberry.style.marginBottom = "4px";
-  labelRaspberry.innerText = "Raspberry";
-
   const selectRaspberry = document.createElement("select");
-  selectRaspberry.style.width = "100%";
+  selectRaspberry.setAttribute("aria-label", "Pi son");
+  selectRaspberry.style.flex = "1 1 auto";
+  selectRaspberry.style.minWidth = "0";
   selectRaspberry.disabled = enLigne.length === 0;
 
   if (enLigne.length === 0) {
@@ -116,69 +116,90 @@ export function ouvrirFenetreImportAudio(params: {
     }
   }
 
-  ligneRaspberry.appendChild(labelRaspberry);
-  ligneRaspberry.appendChild(selectRaspberry);
-  modal.appendChild(ligneRaspberry);
-
-  const actionsListe = document.createElement("div");
-  actionsListe.style.display = "flex";
-  actionsListe.style.gap = "8px";
-  actionsListe.style.marginBottom = "8px";
+  // La barre du haut : le Pi, relire, tout cocher ou rien.
+  const barre = document.createElement("div");
+  barre.style.display = "flex";
+  barre.style.gap = "6px";
+  barre.style.alignItems = "center";
+  barre.style.marginBottom = "6px";
 
   const boutonActualiser = document.createElement("button");
   boutonActualiser.type = "button";
   boutonActualiser.className = "btn btn-sm btn-secondary";
-  boutonActualiser.innerText = "Actualiser la liste";
+  boutonActualiser.innerText = "↻";
+  boutonActualiser.title = "Relire la liste";
   boutonActualiser.disabled = enLigne.length === 0;
 
   const boutonToutCocher = document.createElement("button");
   boutonToutCocher.type = "button";
   boutonToutCocher.className = "btn btn-sm btn-secondary";
-  boutonToutCocher.innerText = "Tout cocher";
+  boutonToutCocher.innerText = "Tout";
+  boutonToutCocher.title = "Tout cocher";
   boutonToutCocher.disabled = true;
 
   const boutonToutDecocher = document.createElement("button");
   boutonToutDecocher.type = "button";
   boutonToutDecocher.className = "btn btn-sm btn-secondary";
-  boutonToutDecocher.innerText = "Tout decocher";
+  boutonToutDecocher.innerText = "Aucun";
+  boutonToutDecocher.title = "Tout décocher";
   boutonToutDecocher.disabled = true;
 
-  actionsListe.appendChild(boutonActualiser);
-  actionsListe.appendChild(boutonToutCocher);
-  actionsListe.appendChild(boutonToutDecocher);
-  modal.appendChild(actionsListe);
+  barre.append(selectRaspberry, boutonActualiser, boutonToutCocher, boutonToutDecocher);
+  modal.appendChild(barre);
+
+  // Seulement quand la piste n'existe pas encore : l'option du Pi dit déjà « → rasp N ».
+  const infoPiste = document.createElement("div");
+  infoPiste.style.fontSize = "12px";
+  infoPiste.style.marginBottom = "6px";
+  infoPiste.style.color = "#9ecbff";
+  modal.appendChild(infoPiste);
 
   const listeSons = document.createElement("div");
   listeSons.style.border = "1px solid #3b4046";
   listeSons.style.borderRadius = "6px";
   listeSons.style.padding = "8px";
   listeSons.style.flex = "1 1 auto";
-  listeSons.style.minHeight = "240px";
+  listeSons.style.minHeight = "160px";
   listeSons.style.overflow = "auto";
   listeSons.style.fontSize = "13px";
   listeSons.innerText = enLigne.length === 0 ? "Aucun Raspberry disponible." : "Chargement...";
   modal.appendChild(listeSons);
 
-  const statut = document.createElement("div");
-  statut.style.fontSize = "12px";
-  statut.style.margin = "8px 0 2px";
-  statut.style.minHeight = "18px";
-  statut.style.whiteSpace = "pre-wrap";
-  modal.appendChild(statut);
-
+  // La barre du bas : le compte rendu, puis les actions sur les sons cochés.
   const actions = document.createElement("div");
   actions.style.display = "flex";
-  actions.style.justifyContent = "flex-end";
+  actions.style.alignItems = "center";
   actions.style.gap = "8px";
   actions.style.marginTop = "8px";
 
+  const statut = document.createElement("div");
+  statut.style.fontSize = "12px";
+  statut.style.flex = "1 1 auto";
+  statut.style.minWidth = "0";
+  statut.style.whiteSpace = "pre-wrap";
+  actions.appendChild(statut);
+
   const boutonFermer = document.createElement("button");
   boutonFermer.type = "button";
+  boutonFermer.className = "fermer-fenetre";
   boutonFermer.innerText = "Fermer";
+
+  const boutonSupprimer = document.createElement("button");
+  boutonSupprimer.type = "button";
+  boutonSupprimer.innerText = "Supprimer";
+  boutonSupprimer.title = "Supprimer du Pi les sons cochés";
+  boutonSupprimer.style.background = "transparent";
+  boutonSupprimer.style.color = "#ef6b5d";
+  boutonSupprimer.style.border = "1px solid #5a2a25";
+  boutonSupprimer.style.padding = "6px 12px";
+  boutonSupprimer.style.borderRadius = "4px";
+  boutonSupprimer.disabled = enLigne.length === 0;
+  if (!params.onSupprimer) boutonSupprimer.style.display = "none";
 
   const boutonImporter = document.createElement("button");
   boutonImporter.type = "button";
-  boutonImporter.innerText = "Importer la selection";
+  boutonImporter.innerText = "Importer";
+  boutonImporter.title = "Importer les sons cochés sur la piste du Pi";
   boutonImporter.style.background = "#2e6da4";
   boutonImporter.style.color = "#fff";
   boutonImporter.style.border = "none";
@@ -196,7 +217,7 @@ export function ouvrirFenetreImportAudio(params: {
       return;
     }
     if (cible.pistePresente) {
-      infoPiste.innerText = `Destination : piste ${cible.nomPiste}`;
+      infoPiste.innerText = "";
     } else {
       infoPiste.innerText = `La piste ${cible.nomPiste} sera creee automatiquement a l'import.`;
     }
@@ -262,6 +283,54 @@ export function ouvrirFenetreImportAudio(params: {
       ligne.appendChild(caseACocher);
       ligne.appendChild(texte);
       rangee.appendChild(ligne);
+
+      const petitBouton = (libelle: string, titreBouton: string) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn btn-sm btn-secondary";
+        b.textContent = libelle;
+        b.title = titreBouton;
+        b.style.minWidth = "36px";
+        b.style.flex = "0 0 auto";
+        return b;
+      };
+      if (params.telecharger) {
+        const ecouter = petitBouton("▶", "Écouter ici");
+        ecouter.setAttribute("aria-pressed", "false");
+        ecouter.addEventListener("click", async () => {
+          const cle = `${ip}/${nom}`;
+          if (lecteur?.cle === cle) {
+            arreterEcoute();
+            return;
+          }
+          arreterEcoute();
+          ecouter.textContent = "…";
+          const r = await params.telecharger!(ip, nom);
+          if (!r.ok) {
+            ecouter.textContent = "▶";
+            statut.innerText = `${nom} : ${r.error}`;
+            return;
+          }
+          const audio = new Audio(URL.createObjectURL(r.blob));
+          lecteur = { audio, cle, bouton: ecouter };
+          ecouter.textContent = "■";
+          ecouter.setAttribute("aria-pressed", "true");
+          audio.addEventListener("ended", () => { if (lecteur?.audio === audio) arreterEcoute(); });
+          void audio.play().catch((e) => {
+            arreterEcoute();
+            statut.innerText = `${nom} : lecture impossible (${e instanceof Error ? e.message : e})`;
+          });
+        });
+        rangee.appendChild(ecouter);
+      }
+      if (params.jouerSurPi) {
+        const surPi = petitBouton("▶ Pi", "Faire jouer le son par le module (/play)");
+        surPi.addEventListener("click", () => {
+          const r = params.jouerSurPi!(ip, nom);
+          statut.innerText = r ?? `${nom} : pas de numéro skini, le module ne sait pas le jouer.`;
+        });
+        rangee.appendChild(surPi);
+      }
 
       // L'aperçu : la forme d'onde colorée par les fréquences ; un clic montre le spectrogramme.
       const apercu = document.createElement("canvas");
@@ -344,6 +413,8 @@ export function ouvrirFenetreImportAudio(params: {
     chargement = true;
     boutonActualiser.disabled = true;
     boutonImporter.disabled = true;
+    boutonSupprimer.disabled = true;
+    arreterEcoute();
     listeSons.innerText = "Chargement des fichiers sur le Pi...";
     statut.innerText = garder;
     mettreAJourInfoPiste();
@@ -352,6 +423,7 @@ export function ouvrirFenetreImportAudio(params: {
     chargement = false;
     boutonActualiser.disabled = false;
     boutonImporter.disabled = false;
+    boutonSupprimer.disabled = false;
 
     if (!resultat.ok) {
       listeSons.innerText = resultat.error;
@@ -363,7 +435,7 @@ export function ouvrirFenetreImportAudio(params: {
     }
 
     remplirListeSons(resultat.fichiers, ip);
-    const nombre = `${resultat.fichiers.length} son(s) disponible(s) sur le Pi.`;
+    const nombre = `${resultat.fichiers.length} son(s) sur le Pi.`;
     statut.innerText = garder ? `${garder}\n${nombre}` : nombre;
   };
 
@@ -386,7 +458,33 @@ export function ouvrirFenetreImportAudio(params: {
   });
 
   boutonFermer.addEventListener("click", () => {
+    arreterEcoute();
     fermerOverlay();
+  });
+
+  boutonSupprimer.addEventListener("click", async () => {
+    const ip = selectRaspberry.value;
+    const fichiers = lireFichiersCoches();
+    if (!ip || !params.onSupprimer) return;
+    if (fichiers.length === 0) {
+      statut.innerText = "Cochez au moins un son à supprimer.";
+      return;
+    }
+    const confirme = await demanderConfirmation(
+      "Supprimer du Pi",
+      `${fichiers.length} son(s) seront supprimés de ${ip} :\n${fichiers.join(", ")}\n\nC'est irréversible.`,
+      "Supprimer",
+      "Annuler",
+      true
+    );
+    if (!confirme) return;
+    arreterEcoute();
+    boutonSupprimer.disabled = true;
+    statut.innerText = `Suppression de ${fichiers.length} son(s)…`;
+    const resultat = await params.onSupprimer({ ip, fichiers });
+    boutonSupprimer.disabled = false;
+    statut.innerText = resultat.message;
+    if (resultat.ok) await chargerSons(resultat.message);
   });
 
   boutonImporter.addEventListener("click", async () => {
@@ -417,6 +515,7 @@ export function ouvrirFenetreImportAudio(params: {
   });
 
   actions.appendChild(boutonFermer);
+  actions.appendChild(boutonSupprimer);
   actions.appendChild(boutonImporter);
   modal.appendChild(actions);
 
