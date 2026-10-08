@@ -48,8 +48,11 @@ function appliquerStyleModal(modal: HTMLDivElement): void {
   modal.style.border = "1px solid #3b4046";
   modal.style.borderRadius = "8px";
   modal.style.width = "460px";
-  modal.style.maxHeight = "80vh";
-  modal.style.overflow = "auto";
+  /* Une colonne : seule la liste des Raspberry défile, les boutons restent en vue. */
+  modal.style.maxHeight = "85vh";
+  modal.style.overflow = "hidden";
+  modal.style.display = "flex";
+  modal.style.flexDirection = "column";
 }
 
 function formaterDureeEnvoi(secondes: number): string {
@@ -183,19 +186,55 @@ export function ouvrirFenetreEnvoiAudio(params: {
     "Cochez les Raspberry. Découpage : chaque coupure devient un fichier. Renommage : le nom s'affiche dans la liste de lecture (ex. daylight). Sur le Pi, le fichier reste son500.wav, car Skini ne joue que /play {numero}.";
   modal.appendChild(hint);
 
+  // Par défaut, seulement les Pi en ligne (les autres ne peuvent rien recevoir) ; ceux qui ont
+  // une piste d'abord.
+  const enLigne = params.cibles.filter((cible) => cible.raspberry.isOnline);
+  const horsLigne = params.cibles.filter((cible) => !cible.raspberry.isOnline);
+  const avecPiste = enLigne.filter((cible) => cible.pistePresente).length;
+
+  const resume = document.createElement("div");
+  resume.style.display = "flex";
+  resume.style.justifyContent = "space-between";
+  resume.style.alignItems = "center";
+  resume.style.fontSize = "12px";
+  resume.style.marginBottom = "8px";
+  const compte = document.createElement("span");
+  compte.innerText =
+    enLigne.length === 0
+      ? "Aucun Raspberry en ligne."
+      : `${enLigne.length} en ligne, dont ${avecPiste} avec une piste rasp N.`;
+  const bascule = document.createElement("label");
+  bascule.style.cursor = "pointer";
+  bascule.style.opacity = "0.85";
+  const caseHorsLigne = document.createElement("input");
+  caseHorsLigne.type = "checkbox";
+  caseHorsLigne.style.marginRight = "4px";
+  bascule.append(caseHorsLigne, `Afficher les hors ligne (${horsLigne.length})`);
+  bascule.hidden = horsLigne.length === 0;
+  resume.append(compte, bascule);
+  modal.appendChild(resume);
+
   const liste = document.createElement("div");
+  liste.style.flex = "1";
+  liste.style.minHeight = "60px";
+  liste.style.overflow = "auto";
   const lignes: LigneEnvoiAudioDom[] = [];
-  if (params.cibles.length === 0) {
-    const vide = document.createElement("div");
-    vide.innerText = "Aucun Raspberry connu pour l'instant.";
-    liste.appendChild(vide);
-  } else {
-    for (const cible of params.cibles) {
-      const ligne = construireLigneEnvoiAudio(cible);
-      lignes.push(ligne);
-      liste.appendChild(ligne.bloc);
-    }
+  const ordonnees = [
+    ...enLigne.filter((cible) => cible.pistePresente),
+    ...enLigne.filter((cible) => !cible.pistePresente),
+    ...horsLigne,
+  ];
+  for (const cible of ordonnees) {
+    const ligne = construireLigneEnvoiAudio(cible);
+    lignes.push(ligne);
+    ligne.bloc.hidden = !cible.raspberry.isOnline;
+    liste.appendChild(ligne.bloc);
   }
+  caseHorsLigne.addEventListener("change", () => {
+    ordonnees.forEach((cible, i) => {
+      if (!cible.raspberry.isOnline) lignes[i].bloc.hidden = !caseHorsLigne.checked;
+    });
+  });
   modal.appendChild(liste);
 
   const statut = document.createElement("div");
