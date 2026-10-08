@@ -120,8 +120,9 @@ export default class PlayheadView extends Container {
         this.handle = new Graphics();
 
         this.handle.moveTo(0, 0);
-        this.handle.lineStyle(1, 0xd3d3d3, 1);
-        this.handle.beginFill(0xd3d3d3);
+        // Thème CRReaM-Lab : le curseur de lecture en ambre, comme sur la maquette.
+        this.handle.lineStyle(1, 0xe2a24b, 1);
+        this.handle.beginFill(0xe2a24b);
         this.handle.lineTo(0, 2/3*height);
         this.handle.lineTo(width/2, height);
         this.handle.lineTo(width/2, 10000);

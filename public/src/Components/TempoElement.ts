@@ -101,6 +101,7 @@ const template = doc/*html*/`
       display:inline-block;
     }
   </style>
+  <link rel="stylesheet" href="style/theme-composants.css">
 
   <div class="tempo-section">
     <input id="input" value="120" id="tempo" pattern="[0-9]+" maxlength=3> 

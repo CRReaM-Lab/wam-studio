@@ -272,6 +272,7 @@ template.innerHTML = /*html*/`
 </style>
 
 <link rel="stylesheet" href="style/icons.css">
+<link rel="stylesheet" href="style/theme-pistes.css">
 <div id="vu-meter-div" class="track-vu-meter"></div>
 
 <div class="track-utils">

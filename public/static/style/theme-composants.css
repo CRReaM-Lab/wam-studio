@@ -1,0 +1,15 @@
+/*
+ * Le thème CRReaM-Lab dans les petits composants de la barre du haut (tempo, mesure : shadow
+ * DOM). Couleurs et polices : variables de theme.css.
+ */
+#input {
+  font: 500 18px var(--police-chiffres, ui-monospace, monospace) !important;
+  color: #f2f3f5 !important;
+  letter-spacing: .01em;
+  border-color: transparent !important;
+  border-radius: 6px;
+}
+#input:hover, #input:focus { border-color: var(--c-ligne, #262a31) !important; background: var(--c-fond, #111316) !important; }
+#label { font: 12px var(--police, system-ui, sans-serif) !important; color: var(--c-doux, #8a929d) !important; }
+.arrowButton { opacity: .65; }
+.arrowButton:hover { opacity: 1; }

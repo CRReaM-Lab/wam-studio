@@ -88,6 +88,8 @@ export default class EditorView extends Application {
         super({
             width: 0,
             height: 0,
+            // Thème CRReaM-Lab (static/style/theme.css) : le fond de l'arrangeur.
+            backgroundColor: 0x121418,
         });
         this.canvasContainer.appendChild(this.view as HTMLCanvasElement);
 

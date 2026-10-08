@@ -1,0 +1,41 @@
+/*
+ * Le thème CRReaM-Lab dans les têtes de pistes (shadow DOM de SoundProviderElement) : chargé à
+ * l'intérieur du composant, après son propre style. Les couleurs viennent des variables de
+ * theme.css, qui traversent le shadow DOM.
+ */
+:host {
+  background: var(--c-panneau, #16191d) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--c-ligne, #262a31) !important;
+  color: var(--c-texte, #e6e8eb);
+  font-family: var(--police, system-ui, sans-serif);
+}
+:host(:hover) { background: #191c21 !important; }
+
+.track-name {
+  background: transparent !important;
+  color: var(--c-texte, #e6e8eb) !important;
+  font: 500 14px var(--police, system-ui, sans-serif) !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.track-name:focus { border-color: var(--c-ligne, #262a31) !important; background: var(--c-fond, #111316) !important; }
+
+/* La couleur de la piste : un liseré, comme sur la maquette. */
+.track-color { width: 4px !important; min-width: 4px !important; border-radius: 2px; margin: 10px 0; }
+
+/* Les boutons M, S et compagnie : des pastilles nettes. */
+.control, ._letter {
+  border-radius: 6px !important;
+  color: var(--c-doux, #8a929d);
+}
+._letter.control { border: 1px solid var(--c-ligne, #262a31) !important; font: 600 12px var(--police, system-ui, sans-serif) !important; }
+._letter.control:hover { color: var(--c-texte, #e6e8eb); background: #22262c; }
+._toggled { background: var(--c-accent-fond, #2a2418) !important; color: var(--c-attention, #f0b35e) !important; border-color: #5a4523 !important; }
+
+.toggle-control { border-radius: 5px !important; }
+.toggle-control:hover, .toggle-control.active { background: #2c5d99 !important; border-color: #3a6eb0 !important; }
+
+/* Curseurs de volume et de balance : une piste fine, une poignée nette. */
+input[type="range"] { accent-color: var(--c-info, #6fb6ff); }

@@ -93,7 +93,7 @@ export default class GridView extends Container {
     // number of bars
     let nbBars = Math.floor(width / barWidth);
     // draw bars
-    const lineColor = "#545252"
+    const lineColor = "#3a3f47"
     for (
       let currentBarNumberXpos = 0;
       currentBarNumberXpos < nbBars;
@@ -128,7 +128,7 @@ export default class GridView extends Container {
           new BitmapText((barNumber + 1).toString(), {
             fontSize: 10,
             fontName: "GridViewFont",
-            tint: 0xe3e3e3, //0x858181,
+            tint: 0x8a929d, //0x858181,
             align: "left",
           })
         );

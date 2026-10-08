@@ -55,6 +55,7 @@ const template = doc/*html*/`
       border: 0;
     }
 =  </style>
+  <link rel="stylesheet" href="style/theme-composants.css">
   <div class="time-signature-section">
     <input id="input" value="4/4" id="time-signature" pattern="^([1-9][0-9]*/[1-9][0-9]*)$" maxlength=5> 
     <span id="label">sig</span> 
