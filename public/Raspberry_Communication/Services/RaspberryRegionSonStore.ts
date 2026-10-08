@@ -86,29 +86,17 @@ function positionsProches(a: EntreeRegionSon, startMs: number, durationMs?: numb
   return Math.abs(a.durationMs - durationMs) <= TOLERANCE_DUREE_MS;
 }
 
+/** Deux entrées pour la même région : même identifiant si les deux en ont un, sinon même place. */
 function memeRegion(a: EntreeRegionSon, b: EntreeRegionSon): boolean {
   if (
     a.trackId !== undefined &&
     a.regionId !== undefined &&
     b.trackId !== undefined &&
-    b.regionId !== undefined &&
-    a.trackId === b.trackId &&
-    a.regionId === b.regionId
+    b.regionId !== undefined
   ) {
-    return true;
+    return a.trackId === b.trackId && a.regionId === b.regionId;
   }
-  if (
-    a.raspberryId === b.raspberryId &&
-    a.indexOrdre !== undefined &&
-    b.indexOrdre !== undefined &&
-    a.indexOrdre === b.indexOrdre
-  ) {
-    return true;
-  }
-  return (
-    a.raspberryId === b.raspberryId &&
-    positionsProches(a, b.startMs, b.durationMs)
-  );
+  return a.raspberryId === b.raspberryId && positionsProches(a, b.startMs, b.durationMs);
 }
 
 export function enregistrerRegionSon(entree: EntreeRegionSon): void {
@@ -138,48 +126,64 @@ export function remplacerRegionsSons(regionsSons: Record<string, EntreeRegionSon
   importerRegionsSonsPersistes(regionsSons);
 }
 
+export type RequeteRegionSon = {
+  raspberryId: number;
+  startMs: number;
+  durationMs?: number;
+  regionId?: number;
+  trackId?: number;
+};
+
+/**
+ * Le son de chaque région, en une passe sur toutes : d'abord par identifiant (trackId, regionId),
+ * puis, pour les autres, par position (début, et durée si connue) sur le même Pi. Un son ne va
+ * qu'à une région : une région jamais envoyée ne prend plus le nom du son d'une autre (l'ancienne
+ * recherche par rang dans la piste, sans regarder le temps, donnait deux « son9 »).
+ */
+export function associerRegionsSons(requetes: RequeteRegionSon[]): (EntreeRegionSon | undefined)[] {
+  const toutes = lireToutes();
+  const prises = new Set<number>();
+  const resultat: (EntreeRegionSon | undefined)[] = requetes.map(() => undefined);
+  requetes.forEach((r, i) => {
+    if (r.trackId === undefined || r.regionId === undefined) return;
+    const j = toutes.findIndex(
+      (item, k) => !prises.has(k) && item.trackId === r.trackId && item.regionId === r.regionId
+    );
+    if (j >= 0) {
+      prises.add(j);
+      resultat[i] = toutes[j];
+    }
+  });
+  const parPosition = (r: RequeteRegionSon, avecDuree: boolean) =>
+    toutes.findIndex(
+      (item, k) =>
+        !prises.has(k) &&
+        item.raspberryId === r.raspberryId &&
+        // Une entrée attachée à une autre région vivante ne se prête pas.
+        (item.trackId === undefined || item.trackId === r.trackId) &&
+        positionsProches(item, r.startMs, avecDuree ? r.durationMs : undefined)
+    );
+  requetes.forEach((r, i) => {
+    if (resultat[i]) return;
+    let j = r.durationMs !== undefined ? parPosition(r, true) : -1;
+    if (j < 0) j = parPosition(r, false);
+    if (j >= 0) {
+      prises.add(j);
+      resultat[i] = toutes[j];
+    }
+  });
+  return resultat;
+}
+
+/** Le son d'une seule région (même règle qu'associerRegionsSons). */
 export function trouverSonPourRegion(
   raspberryId: number,
   startMs: number,
   regionId?: number,
   trackId?: number,
-  durationMs?: number,
-  indexOrdre?: number
+  durationMs?: number
 ): EntreeRegionSon | undefined {
-  const toutes = lireToutes();
-
-  if (trackId !== undefined && regionId !== undefined) {
-    const parId = toutes.find(
-      (item) => item.trackId === trackId && item.regionId === regionId
-    );
-    if (parId) {
-      return parId;
-    }
-  }
-
-  if (indexOrdre !== undefined) {
-    const parOrdre = toutes.find(
-      (item) => item.raspberryId === raspberryId && item.indexOrdre === indexOrdre
-    );
-    if (parOrdre) {
-      return parOrdre;
-    }
-  }
-
-  if (durationMs !== undefined) {
-    const parPosition = toutes.find(
-      (item) =>
-        item.raspberryId === raspberryId &&
-        positionsProches(item, startMs, durationMs)
-    );
-    if (parPosition) {
-      return parPosition;
-    }
-  }
-
-  return toutes.find(
-    (item) => item.raspberryId === raspberryId && positionsProches(item, startMs)
-  );
+  return associerRegionsSons([{ raspberryId, startMs, regionId, trackId, durationMs }])[0];
 }
 
 export function listerSonsPourRaspberry(raspberryId: number): EntreeRegionSon[] {

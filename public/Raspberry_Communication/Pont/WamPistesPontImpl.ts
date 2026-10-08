@@ -6,7 +6,7 @@ import type { IWamPistesPont, PisteRaspberryCreee, PositionLibelleRegion, Positi
 import { creerBinding } from "../Models/RaspberryTrackBinding";
 import { appliquerIndicateurRaspberry } from "../Services/RaspberryIndicateurPisteUi";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
-import { enregistrerRegionSon, trouverSonPourRegion, type EntreeRegionSonPersiste } from "../Services/RaspberryRegionSonStore";
+import { enregistrerRegionSon, associerRegionsSons, trouverSonPourRegion, type EntreeRegionSonPersiste } from "../Services/RaspberryRegionSonStore";
 import { formaterNomPisteRaspberry, lireNumeroRaspberryDepuisElementPiste, lireNumeroRaspberryDepuisNomPiste } from "../utils/agent-transfert/AgentTransfertHelpers";
 import { formaterNomAfficheSon } from "../utils/osc/NomSonPiste";
 import { lireLibelleSon } from "../Services/RaspberryLibellesSonsStore";
@@ -135,20 +135,19 @@ export default class WamPistesPontImpl implements IWamPistesPont {
       if (raspberryId === undefined) {
         continue;
       }
-      const regions = this.lireRegionsAudioOrdonnees(track.id);
+      const regions = this.lireRegionsAudioOrdonnees(track.id).filter(Boolean);
+      const metas = associerRegionsSons(
+        regions.map((region) => ({
+          raspberryId,
+          startMs: region.start,
+          durationMs: region.duration,
+          regionId: region.id,
+          trackId: track.id,
+        }))
+      );
       for (let indexOrdre = 0; indexOrdre < regions.length; indexOrdre++) {
         const region = regions[indexOrdre];
-        if (!region) {
-          continue;
-        }
-        const meta = trouverSonPourRegion(
-          raspberryId,
-          region.start,
-          region.id,
-          track.id,
-          region.duration,
-          indexOrdre
-        );
+        const meta = metas[indexOrdre];
         resultat.push({
           trackId: track.id,
           regionId: region.id,
@@ -596,8 +595,7 @@ export default class WamPistesPontImpl implements IWamPistesPont {
           regionLive.start,
           regionLive.id,
           track.id,
-          regionLive.duration,
-          indexOrdre
+          regionLive.duration
         );
         if (!meta || !meta.nomAffiche || meta.nomAffiche === "son ?") {
           indexOrdre++;

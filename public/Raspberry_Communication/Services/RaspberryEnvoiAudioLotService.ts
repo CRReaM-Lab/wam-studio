@@ -14,7 +14,6 @@ import {
 } from "../utils/osc/AttributionNumerosSons";
 import { enregistrerLibelleSon } from "./RaspberryLibellesSonsStore";
 import { nommerRegionApresEnregistrement } from "./RaspberryNomRegionService";
-import { trouverSonPourRegion } from "./RaspberryRegionSonStore";
 import RaspberryPisteLiaisonService from "./RaspberryPisteLiaisonService";
 import RaspberryPisteExportService, {
   type PlanNomFichierSon,
@@ -275,15 +274,9 @@ function enregistrerNomRegionApresEnvoi(params: {
   if (!region) {
     return;
   }
-  const dejaSurLaPiste = trouverSonPourRegion(
-    params.raspberryId,
-    region.startMs,
-    region.regionId,
-    params.trackId,
-    region.durationMs,
-    params.index
-  );
-  const nomFichier = dejaSurLaPiste?.nomFichier || params.nomFichier;
+  // La région porte le son qu'on vient de déposer, jamais celui qu'une recherche approximative
+  // lui trouverait (un son importé plus tôt à la même place donnait son nom à la région).
+  const nomFichier = params.nomFichier;
   const sonAffiche = extraireNumeroSonOscDepuisFichier(nomFichier);
   nommerRegionApresEnregistrement(params.pont, {
     trackId: params.trackId,
@@ -292,7 +285,7 @@ function enregistrerNomRegionApresEnvoi(params: {
     startMs: region.startMs,
     durationMs: region.durationMs,
     nomFichier,
-    sonNumber: sonAffiche ?? dejaSurLaPiste?.sonNumber ?? params.sonNumber,
-    indexOrdre: dejaSurLaPiste?.indexOrdre ?? params.index,
+    sonNumber: sonAffiche ?? params.sonNumber,
+    indexOrdre: params.index,
   });
 }
