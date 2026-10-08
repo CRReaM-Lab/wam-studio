@@ -14,6 +14,8 @@ export type MenuRegion =
       proposer: () => Promise<{ numero: number; pris: Set<number> | null; remarque?: string }>;
       /** Les effets (FX) de la piste, à nommer à côté de « Appliquer l'effet » ; vide : pas de case. */
       effets: string[];
+      /** Charge la chaîne FX de la piste dans les inserts du module (`/fx`) ; absent : pas de bouton. */
+      effetsSurModule?: () => string;
       /** Lance l'envoi ; `lireStatut` est relu pendant l'envoi pour l'afficher. */
       envoyer: (numero: number, appliquerEffet: boolean) => Promise<{ ok: boolean; message: string }>;
       lireStatut: () => string | undefined;
@@ -107,6 +109,20 @@ export function ouvrirMenuRegion(x: number, y: number, menu: MenuRegion): void {
       texteEffet.innerText = `Appliquer l'effet de la piste (${menu.effets.join(" → ")})`;
       ligneEffet.append(caseEffet, texteEffet);
       boite.appendChild(ligneEffet);
+      if (menu.effetsSurModule) {
+        // L'autre voie : le son reste sec, le module joue l'effet (réglable en direct).
+        const surModule = document.createElement("button");
+        surModule.type = "button";
+        surModule.className = "btn btn-sm btn-secondary";
+        surModule.style.marginTop = "6px";
+        surModule.innerText = "Jouer l'effet sur le module";
+        surModule.title = "Charge la chaîne FX de la piste dans les inserts du module (/fx) : le son envoyé reste sec";
+        surModule.onclick = () => {
+          statut.style.color = "";
+          statut.innerText = menu.effetsSurModule!();
+        };
+        boite.appendChild(surModule);
+      }
     }
 
     const statut = document.createElement("div");

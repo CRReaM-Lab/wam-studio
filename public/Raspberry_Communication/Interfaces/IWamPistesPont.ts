@@ -13,6 +13,8 @@ export type EffetDecrit = {
   version?: string;
   /** Sa place dans la chaîne (0 : la première). */
   position: number;
+  /** La pédale Pd correspondante sur les modules (`greyhole` pour `[greyhole~]`) ; null : aucune. */
+  objetPd: string | null;
   /** L'état complet de ses paramètres (getState). */
   etat: unknown;
 };

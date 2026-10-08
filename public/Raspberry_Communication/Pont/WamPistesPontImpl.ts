@@ -2,6 +2,7 @@ import App from "../../src/App";
 import OperableAudioBuffer from "../../src/Audio/OperableAudioBuffer";
 import type { ProjectData } from "../../src/Loader/Loader";
 import SampleRegion from "../../src/Models/Region/SampleRegion";
+import { pedalePd } from "../Services/PedalesPd";
 import type { EffetDecrit, IWamPistesPont, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
 import { creerBinding } from "../Models/RaspberryTrackBinding";
 import { appliquerIndicateurRaspberry } from "../Services/RaspberryIndicateurPisteUi";
@@ -94,13 +95,16 @@ export default class WamPistesPontImpl implements IWamPistesPont {
     const etat = await plugin.getState();
     // Le pedalboard : sa chaîne de pédales (wam_id de chacune, état), et la bibliothèque d'où elles viennent.
     if (etat && Array.isArray(etat.plugins)) {
-      return (etat.plugins as { wam_id: string; state: unknown }[]).map((p, position) => ({
-        nom: String(p.wam_id).split(/[/:#]/).filter(Boolean).pop() ?? String(p.wam_id),
-        wamId: String(p.wam_id),
-        source: etat.library,
-        position,
-        etat: p.state,
-      }));
+      return Promise.all(
+        (etat.plugins as { wam_id: string; state: unknown }[]).map(async (p, position) => ({
+          nom: String(p.wam_id).split(/[/:#.]/).filter(Boolean).pop() ?? String(p.wam_id),
+          wamId: String(p.wam_id),
+          source: etat.library,
+          position,
+          objetPd: await pedalePd(etat.library, String(p.wam_id)),
+          etat: p.state,
+        }))
+      );
     }
     return [{
       nom: descripteur.name ?? plugin.name,
@@ -109,6 +113,7 @@ export default class WamPistesPontImpl implements IWamPistesPont {
       fabricant: descripteur.vendor,
       version: descripteur.version,
       position: 0,
+      objetPd: null,
       etat,
     }];
   }

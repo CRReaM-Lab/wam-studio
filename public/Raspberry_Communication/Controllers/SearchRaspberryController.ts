@@ -776,10 +776,48 @@ export default class SearchRaspberryController {
       titre,
       proposer: () => this.premierNumeroLibre(raspberry.ip, binding.sonNumber),
       effets: effets.map((e) => e.nom),
+      effetsSurModule: () => this.chargerEffetsSurModule(raspberry.ip, effets),
       envoyer: (numero, appliquerEffet) =>
         this.envoyerRegionVersRaspberry(binding, raspberry, region, numero, appliquerEffet ? effets : []),
       lireStatut: () => this.state.transfertLastStatusByIp.get(raspberry.ip)?.text,
     });
+  }
+
+  /**
+   * La chaîne FX d'une piste jouée par le module : chaque pédale dans son emplacement d'insert
+   * (`/fx <n> charge <pédale>`, puis ses réglages `/fx <n> <paramètre> <valeur>`), les emplacements
+   * restants vidés. Rend le compte rendu à afficher.
+   */
+  private chargerEffetsSurModule(ip: string, effets: EffetDecrit[]): string {
+    const EMPLACEMENTS = 4;
+    const messages: string[] = [];
+    const sautees: string[] = [];
+    effets.slice(0, EMPLACEMENTS).forEach((e, i) => {
+      const n = i + 1;
+      if (!e.objetPd) {
+        sautees.push(e.nom);
+        messages.push(`${n} vide`);
+        return;
+      }
+      messages.push(`${n} charge ${e.objetPd}`);
+      for (const [adresse, valeur] of Object.entries((e.etat ?? {}) as Record<string, unknown>)) {
+        const parametre = adresse.split("/").filter(Boolean).pop();
+        const nombre = Number(valeur);
+        if (parametre && Number.isFinite(nombre)) messages.push(`${n} ${parametre} ${nombre}`);
+      }
+    });
+    for (let n = effets.length + 1; n <= EMPLACEMENTS; n++) messages.push(`${n} vide`);
+    for (const m of messages) {
+      if (!this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: m })) {
+        return "WebSocket du serveur non connecté : effets non envoyés.";
+      }
+    }
+    const chargees = effets.slice(0, EMPLACEMENTS).filter((e) => e.objetPd).map((e) => e.objetPd);
+    return (
+      `Module ${ip} : ${chargees.length ? chargees.join(" → ") : "aucun effet"}.` +
+      (sautees.length ? `\nSans équivalent sur le module : ${sautees.join(", ")}.` : "") +
+      (effets.length > EMPLACEMENTS ? `\nSeuls les ${EMPLACEMENTS} premiers effets tiennent dans les inserts.` : "")
+    );
   }
 
   /** Le premier numéro ≥ `depart` sans fichier `son{N}*.wav` sur le Pi, et les numéros présents. */
