@@ -44,6 +44,8 @@ export function construireProgrammeServeur(regions: EvenementSequenceurOsc[]): E
   }
   for (const marqueur of lireMarqueursSequenceur()) {
     const tMs = Math.round(marqueur.tempsMs);
+    // Un repère ne sert qu'à naviguer dans WAM : rien à envoyer aux Pi.
+    if (marqueur.type === "repere") continue;
     if (marqueur.type === "cue") {
       evenements.push({ tMs, ip: "", adresse: "", valeur: "", cue: true, libelle: marqueur.libelle });
       continue;

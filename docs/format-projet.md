@@ -22,16 +22,17 @@ consignée dans `meta.migrations` et sauvée avec le projet à la sauvegarde sui
 | 1.1 | `tracks[].raspberry` : la piste liée à un Pi son | rien à convertir (le champ existait déjà en 1.0, ajouté sans changer la version) |
 | 1.2 | `marqueurs` | absents : ceux du navigateur (`localStorage`) sont repris |
 | 1.3 | `regionsSons` (lien région → son du Pi) ; `meta` | absent : repris du navigateur |
+| 1.4 | marqueurs de type `repere` (touche M, comme REAPER : pour naviguer, rien n'est envoyé aux Pi) | rien à convertir ; un WAM 1.3 les perdrait en resauvant |
 
 **Compatibilité avec le WAM de Jauris (format 1.0)** : il refuse un projet 1.3 (« trop récent »).
 C'est voulu : sinon il ouvrirait le projet, puis effacerait marqueurs et numéros de son en le
-resauvant.
+resauvant. Même chose d'un WAM 1.3 face à un projet 1.4 (les repères).
 
 ## Les champs
 
 ```jsonc
 {
-  "version": [1, 3],
+  "version": [1, 4],
   "host": {
     "playhead": 0,                    // position de lecture (ms) à la sauvegarde
     "tempo": 120,
@@ -62,7 +63,9 @@ resauvant.
     { "id": "marqueur-…", "type": "osc", "tempsMs": 4800,
       "libelle": "Stop", "oscAdresse": "/stop", "oscValeur": "508" },
     { "id": "marqueur-…", "type": "cue", "tempsMs": 1000,
-      "libelle": "Entrée chœur", "oscAdresse": "", "oscValeur": "" }
+      "libelle": "Entrée chœur", "oscAdresse": "", "oscValeur": "" },
+    { "id": "marqueur-…", "type": "repere", "tempsMs": 2000,             // 1.4
+      "libelle": "Repère 1", "oscAdresse": "", "oscValeur": "" }
   ],
   "regionsSons": {                                     // 1.3 — clé : content_name de la région
     "track-1-region-3.wav": {

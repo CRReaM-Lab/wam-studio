@@ -68,7 +68,7 @@ export function definirIdMarqueurEdite(id: string | null): void {
 }
 
 function couleurMarqueur(type: MarqueurSequenceur["type"]): string {
-  return type === "cue" ? "#fdd835" : "#ff9800";
+  return type === "cue" ? "#fdd835" : type === "repere" ? "#9aa3ad" : "#ff9800";
 }
 
 function creerDrapeau(marqueur: MarqueurSequenceur): HTMLDivElement {

@@ -1,5 +1,5 @@
 import App from "../App";
-import { registerOnKeyUp } from "../Utils/keys";
+import { isKeyPressed, registerOnKeyUp } from "../Utils/keys";
 
 /**
  * The class that control the events related to the keyboard.
@@ -26,6 +26,9 @@ export default class KeyboardController {
             switch (key) {
                 case " ": // Space bar pressed : play/pause
                     this._app.hostController.onPlayButton()
+                    break
+                case "r": // Comme REAPER : boucle on/off
+                    if(!isKeyPressed("Control","Meta"))this._app.hostController.loop()
                     break
             }
         })

@@ -7,7 +7,7 @@
  * Un projet plus récent que ce WAM est refusé ; un projet plus ancien est migré pas à pas, et
  * chaque migration est consignée dans `meta.migrations`, sauvée avec le projet.
  */
-export const CURRENT_PROJECT_VERSION: [number, number] = [1, 3];
+export const CURRENT_PROJECT_VERSION: [number, number] = [1, 4];
 
 /** Une migration appliquée à un projet, consignée dans ses métadonnées. */
 export type MigrationConsignee = {
@@ -55,6 +55,10 @@ const MIGRATIONS: Migration[] = [
       p.regionsSons && typeof p.regionsSons === "object"
         ? `lien région → son du Pi (regionsSons) : ${Object.keys(p.regionsSons).length} déjà présent(s)`
         : "lien région → son du Pi (regionsSons) : absent, repris du navigateur",
+  },
+  {
+    vers: [1, 4],
+    appliquer: () => "repères (marqueurs de type « repere », touche M) : rien à convertir",
   },
 ];
 

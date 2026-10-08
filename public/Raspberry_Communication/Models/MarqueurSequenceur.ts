@@ -1,4 +1,5 @@
-export type TypeMarqueurSequenceur = "osc" | "cue";
+/** `repere` : un simple repère pour naviguer (touche M, comme dans REAPER) ; ni OSC ni arrêt. */
+export type TypeMarqueurSequenceur = "osc" | "cue" | "repere";
 
 export type MarqueurSequenceur = {
   id: string;

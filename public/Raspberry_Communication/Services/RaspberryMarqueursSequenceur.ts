@@ -53,7 +53,8 @@ export function evenementDepuisMarqueur(marqueur: MarqueurSequenceur): Evenement
       ? "cue (Espace)"
       : `${marqueur.oscAdresse} ${marqueur.oscValeur}`.trim();
   return {
-    kind: marqueur.type,
+    // Le séquenceur ne reçoit que les marqueurs OSC et les cues (un repère n'y va jamais).
+    kind: marqueur.type === "cue" ? "cue" : "osc",
     idMarqueur: marqueur.id,
     raspberryId: 0,
     nomPiste: marqueur.type === "cue" ? "Cue" : "OSC",

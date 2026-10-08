@@ -11,7 +11,7 @@ function lireStockage(): Storage | null {
 }
 
 function estTypeMarqueur(valeur: unknown): valeur is TypeMarqueurSequenceur {
-  return valeur === "osc" || valeur === "cue";
+  return valeur === "osc" || valeur === "cue" || valeur === "repere";
 }
 
 function lireMarqueurBrut(valeur: unknown): MarqueurSequenceur | null {

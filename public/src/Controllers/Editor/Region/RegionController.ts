@@ -1,12 +1,12 @@
 import { FederatedPointerEvent } from "pixi.js";
 import App, { crashOnDebug } from "../../../App";
-import { MIDI } from "../../../Audio/MIDI/MIDI";
 import { RATIO_MILLS_BY_PX } from "../../../Env";
 import MIDIRegion from "../../../Models/Region/MIDIRegion";
 import Region, { RegionOf, RegionType } from "../../../Models/Region/Region";
 import SampleRegion from "../../../Models/Region/SampleRegion";
 import Track from "../../../Models/Track/Track";
 import { isKeyPressed, registerOnKeyDown, registerOnKeyUp } from "../../../Utils/keys";
+import { ajouterMarqueurSequenceur, creerIdMarqueur, lireMarqueursSequenceur } from "../../../../Raspberry_Communication/Services/RaspberryMarqueursStore";
 import EditorView from "../../../Views/Editor/EditorView.js";
 import MIDIRegionView from "../../../Views/Editor/Region/MIDIRegionView";
 import RegionView from "../../../Views/Editor/Region/RegionView";
@@ -291,63 +291,14 @@ export default class RegionController {
           break
 
         case "m":
-          this.splitSelectedRegion()
+          // Comme REAPER : un repère au curseur (ni OSC ni cue, pour naviguer).
+          if(!meta)this.poserRepere()
           break
 
-        case "x":
-          if(meta)this.cutSelectedRegion()
+        case "d":
+          // Comme REAPER (⌘D) : la région dupliquée juste après elle-même.
+          if(meta)this.duplicateSelectedRegion()
           break
-
-        case "c":
-          if(meta)this.copySelectedRegion()
-          break
-
-        case "v":
-          if(meta)this.pasteRegion(true)
-          break
-
-        case "b":
-          const selected=this._app.tracksController.selectedTrack
-          if(selected){
-            const start=this._app.host.playhead
-            const { DO,DO_,RE,RE_,MI,FA,FA_,SOL,SOL_,LA,LA_,SI, $, i, ii, iii, iiii }=MIDI
-            const midi=MIDI.fromList([
-              MI, null, MI, MI, null, DO, MI+i, null, SOL+ii, null, null, null, SOL-$+i, null, null, null,
-              DO+i, null, null, SOL-$+i, null, null, MI-$, null, null, LA-$, null, SI-$, null, LA_-$, LA-$,
-            ], 200)
-            const region=new MIDIRegion(midi,start)
-            this.addRegion(selected,region)
-          }
-          break
-
-        case "n":{
-          const selected=this._app.tracksController.selectedTrack
-          if(selected){
-            const start=this._app.host.playhead
-            const { DO,DO_,RE,RE_,MI,FA,FA_,SOL,SOL_,LA,LA_,SI, $, i, ii, iii, iiii }=MIDI
-            const midi=MIDI.fromList([DO,MI,DO,MI,DO,MI,DO,MI,DO,MI,DO], 500)
-            const region=new MIDIRegion(midi,start)
-            this.addRegion(selected,region)
-          }
-          break
-        }
-
-        case "k":{
-          const selected=this._app.tracksController.selectedTrack
-          if(selected){
-            const start=this._app.host.playhead
-            const { DO,DO_,RE,RE_,MI,FA,FA_,SOL,SOL_,LA,LA_,SI, $, i:I, ii:II, iii:III, iiii:IIII }=MIDI
-            const _=null
-            let input= prompt("Write MIDI Notes")?.toUpperCase()?.replace(/ /g,",")
-            input="["+input+"]"
-            console.log(input)
-            const midi=MIDI.fromList(eval(input) as number[]  , 500)
-            const region=new MIDIRegion(midi,start)
-            this.addRegion(selected,region)
-            this._app.host.playhead=region.end
-          }
-          break
-        }
       }
     });
     // handle moving a region on the PIXI Canvas.
@@ -487,6 +438,41 @@ export default class RegionController {
 
   private copySelectedRegion() {
     if (this.selection.primary) this.copyRegion(this.selection.primary, true);
+  }
+
+  /**
+   * Duplique la région sélectionnée juste après elle-même, sur sa piste (⌘D, comme REAPER) ; la
+   * copie devient la sélection.
+   */
+  private duplicateSelectedRegion() {
+    const region = this.selection.primary
+    if (!region || region.trackId == -1) return
+    const track = this._app.tracksController.getTrackById(region.trackId)
+    if (!track || track.deleted) return
+    const copie = region.clone() as RegionOf<any>
+    copie.start = region.end
+    this.doIt(true,
+      ()=>{
+        this.addRegion(track,copie)
+        this.selection.set(copie)
+      },
+      ()=>{
+        this.removeRegion(copie)
+      }
+    )
+  }
+
+  /** Pose un repère au curseur de lecture (touche M, comme REAPER), nommé « Repère n ». */
+  private poserRepere() {
+    const reperes = lireMarqueursSequenceur().filter(m => m.type === "repere")
+    ajouterMarqueurSequenceur({
+      id: creerIdMarqueur(),
+      type: "repere",
+      tempsMs: this._app.host.playhead,
+      libelle: `Repère ${reperes.length + 1}`,
+      oscAdresse: "",
+      oscValeur: "",
+    })
   }
 
   private pasteRegion(undoable: boolean=false) {
