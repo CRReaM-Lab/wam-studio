@@ -381,7 +381,7 @@ export default class RegionController {
    * Deletes the current selected region and the corresponding view.
    * @private
    */
-  private deleteSelectedRegion(undoable:boolean): void {
+  public deleteSelectedRegion(undoable:boolean): void {
     if ( this.draggedRegionState )return;
     const toRemove= this.selection.selecteds.map(it=>({region:it, track:it.trackId}))
     this.doIt(undoable,
@@ -432,11 +432,11 @@ export default class RegionController {
     )
   }
 
-  private cutSelectedRegion() {
+  public cutSelectedRegion() {
     if (this.selection.primary) this.cutRegion(this.selection.primary, true);
   }
 
-  private copySelectedRegion() {
+  public copySelectedRegion() {
     if (this.selection.primary) this.copyRegion(this.selection.primary, true);
   }
 
@@ -444,7 +444,7 @@ export default class RegionController {
    * Duplique la région sélectionnée juste après elle-même, sur sa piste (⌘D, comme REAPER) ; la
    * copie devient la sélection.
    */
-  private duplicateSelectedRegion() {
+  public duplicateSelectedRegion() {
     const region = this.selection.primary
     if (!region || region.trackId == -1) return
     const track = this._app.tracksController.getTrackById(region.trackId)
@@ -463,7 +463,7 @@ export default class RegionController {
   }
 
   /** Pose un repère au curseur de lecture (touche M, comme REAPER), nommé « Repère n ». */
-  private poserRepere() {
+  public poserRepere() {
     const reperes = lireMarqueursSequenceur().filter(m => m.type === "repere")
     ajouterMarqueurSequenceur({
       id: creerIdMarqueur(),
@@ -475,7 +475,7 @@ export default class RegionController {
     })
   }
 
-  private pasteRegion(undoable: boolean=false) {
+  public pasteRegion(undoable: boolean=false) {
     if (!this.regionClipboard) return;
 
     const {region}=this.regionClipboard

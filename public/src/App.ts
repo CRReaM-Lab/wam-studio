@@ -13,6 +13,7 @@ import EditorController from "./Controllers/Editor/EditorController";
 import LoopController from "./Controllers/Editor/LoopController";
 import PlayheadController from "./Controllers/Editor/PlayheadController";
 import RegionController from "./Controllers/Editor/Region/RegionController";
+import PaletteOutilsView from "./Views/PaletteOutilsView";
 import WaveformController from "./Controllers/Editor/WaveformController";
 import ExporterController from "./Controllers/ExportController";
 import KeyboardController from "./Controllers/KeyboardController";
@@ -104,6 +105,8 @@ export default class App {
         this.keyboardController = new KeyboardController(this);
         this.exportController = new ExporterController(this);
         this.loopController = new LoopController(this);
+        // La palette d'outils de l'arrangeur (gestes de REAPER, modes tactiles).
+        new PaletteOutilsView(this);
         
         this.hostController.addDraggableWindow(this.pluginsView, this.latencyView, this.settingsView, 
             this.projectView, this.aboutView, this.keyboardShortcutsView);
