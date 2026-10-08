@@ -1,5 +1,5 @@
 import type { IWamPistesPont } from "../Interfaces/IWamPistesPont";
-import { couleurSection, etatEnvoi, type EtatEnvoi } from "./RaspberryEtatEnvoiRegions";
+import { couleurSection, effetsDuSon, etatEnvoi, type EtatEnvoi } from "./RaspberryEtatEnvoiRegions";
 import { raspberryTrackBindingStore } from "./RaspberryTrackBindingStore";
 
 const ID_CONTENEUR = "raspberry-region-labels";
@@ -101,7 +101,10 @@ export function rafraichirLibellesRegionUi(pont: IWamPistesPont): void {
     const etat = etatEnvoi(ip, item);
     const m = MARQUES[etat];
     const nom = item.nomAffiche && item.nomAffiche !== "son ?" ? item.nomAffiche : "";
-    const texte = etat === "sur-pi" || etat === "importee" || etat === "inconnu" ? `${m.marque} ${nom}`.trim() : `${m.marque}${nom ? " · " + nom : ""}`;
+    const base = etat === "sur-pi" || etat === "importee" || etat === "inconnu" ? `${m.marque} ${nom}`.trim() : `${m.marque}${nom ? " · " + nom : ""}`;
+    // Un son envoyé avec l'effet de la piste appliqué : sa fiche le dit, l'étiquette aussi.
+    const effets = etat === "a-envoyer" ? [] : effetsDuSon(ip, item);
+    const texte = effets.length ? `${base} · fx ${effets.join(" → ")}` : base;
 
     let libelle = conteneur.querySelector<HTMLDivElement>(`[${ATTR_LIBELLE}="${cle}"]`);
     if (!libelle) {

@@ -24,6 +24,8 @@ export type TransfertFormulaire = TransfertDraft & {
   sshUsername: string;
   raspberryId: number;
   sonNumber?: number;
+  /** La fiche du son, posée à côté de lui sur le Pi (origine, effets appliqués). */
+  fiche?: Record<string, unknown>;
 };
 
 function lireSonNumber(formulaire: Pick<TransfertFormulaire, "sonNumber">): number {
@@ -259,5 +261,6 @@ export function construireCommandeStartTransfer(
     sonNumber: lireSonNumber(formulaire),
   };
   commande.remotePath = apercuCheminComplet(formulaire, "export.wav");
+  if (formulaire.fiche) commande.fiche = formulaire.fiche;
   return commande;
 }

@@ -57,7 +57,7 @@ import {
   lancerAgentTransfertDepuisUi,
   synchroniserEtatAgent,
 } from "./connexion/SearchRaspberryLancementAgent";
-import type { IWamPistesPont } from "../Interfaces/IWamPistesPont";
+import type { EffetDecrit, IWamPistesPont } from "../Interfaces/IWamPistesPont";
 import RaspberryPisteLiaisonService from "../Services/RaspberryPisteLiaisonService";
 import RaspberryPisteAutoCreationService from "../Services/RaspberryPisteAutoCreationService";
 import RaspberryPisteExportService from "../Services/RaspberryPisteExportService";
@@ -270,7 +270,7 @@ export default class SearchRaspberryController {
       return null;
     });
     this.liaisonPistes = new RaspberryPisteLiaisonService(pont);
-    pont.abonnerClicDroitRegion((trackId, regionId, x, y) => this.ouvrirMenuRegion(trackId, regionId, x, y));
+    pont.abonnerClicDroitRegion((trackId, regionId, x, y) => void this.ouvrirMenuRegion(trackId, regionId, x, y));
     this.autoCreationPistes = new RaspberryPisteAutoCreationService(this.liaisonPistes);
     this.exportPistes = new RaspberryPisteExportService(pont);
     this.envoiAudioLot = new RaspberryEnvoiAudioLotService(
@@ -745,7 +745,7 @@ export default class SearchRaspberryController {
    * Clic droit sur une région : l'envoyer au Pi de sa piste « rasp N », sous le premier numéro
    * de son libre à partir du numéro de départ de la piste (500 par défaut).
    */
-  private ouvrirMenuRegion(trackId: number, regionId: number, x: number, y: number): void {
+  private async ouvrirMenuRegion(trackId: number, regionId: number, x: number, y: number): Promise<void> {
     const pont = this.pontPistes;
     const binding = raspberryTrackBindingStore.trouverParTrackId(trackId);
     if (!pont || !binding || binding.liee === false) {
@@ -769,11 +769,15 @@ export default class SearchRaspberryController {
       ouvrirMenuRegion(x, y, { type: "indisponible", titre, raison: "Seules les régions audio s'envoient (pas le MIDI)." });
       return;
     }
+    // Les effets de la piste, décrits maintenant : c'est ce qui sera appliqué et noté dans la fiche.
+    const effets = await pont.decrireEffetsPiste(trackId).catch(() => [] as EffetDecrit[]);
     ouvrirMenuRegion(x, y, {
       type: "envoi",
       titre,
       proposer: () => this.premierNumeroLibre(raspberry.ip, binding.sonNumber),
-      envoyer: (numero) => this.envoyerRegionVersRaspberry(binding, raspberry, region, numero),
+      effets: effets.map((e) => e.nom),
+      envoyer: (numero, appliquerEffet) =>
+        this.envoyerRegionVersRaspberry(binding, raspberry, region, numero, appliquerEffet ? effets : []),
       lireStatut: () => this.state.transfertLastStatusByIp.get(raspberry.ip)?.text,
     });
   }
@@ -804,10 +808,14 @@ export default class SearchRaspberryController {
     raspberry: Raspberry,
     /** `rang` : position de la région sur la piste (la mémoire des étiquettes s'en sert). */
     region: { regionId: number; startMs: number; durationMs: number; rang: number },
-    numero: number
+    numero: number,
+    /** Les effets appliqués au son (vide : le son sec). */
+    effets: EffetDecrit[] = []
   ): Promise<{ ok: boolean; message: string }> {
     const pont = this.pontPistes;
-    const blob = pont?.exporterRegionAudio(binding.trackId, region.regionId);
+    const blob = effets.length
+      ? await pont?.exporterRegionAvecEffets(binding.trackId, region.regionId)
+      : pont?.exporterRegionAudio(binding.trackId, region.regionId);
     if (!pont || !blob) {
       return { ok: false, message: "Région introuvable." };
     }
@@ -827,6 +835,12 @@ export default class SearchRaspberryController {
       sshUsername: "pi",
       raspberryId: binding.raspberryId,
       sonNumber: numero,
+      fiche: {
+        origine: "wam",
+        piste: pont.lireNomPiste(binding.trackId) ?? `rasp ${binding.raspberryId}`,
+        region: { id: region.regionId, debutMs: region.startMs, dureeMs: region.durationMs },
+        effets,
+      },
     });
     this.rafraichirPanneauDetailsSiSelectionne(raspberry.ip, { forcer: true });
     if (!resultat.ok) {

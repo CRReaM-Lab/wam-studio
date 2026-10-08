@@ -27,20 +27,38 @@ const TOLERANCE_DUREE_MS = 60;
 const PALETTE_SECTIONS = ["#5aa9f5", "#a18cf2", "#e8a24f", "#5fc4a8", "#e586b4", "#c9c46b"];
 
 let sonsParIp = new Map<string, Set<string> | null>();
+/** Les effets appliqués à chaque son (d'après sa fiche), par Pi puis par fichier. */
+let effetsParIp = new Map<string, Map<string, string[]>>();
 let sectionsParIp = new Map<string, string>();
 
 export function noterInventaire(inventaire: Inventaire): void {
   const suivant = new Map<string, Set<string> | null>();
+  const effets = new Map<string, Map<string, string[]>>();
   for (const pi of inventaire.pis) {
     if (pi.erreur) {
       suivant.set(pi.ip, null);
       continue;
     }
     const fichiers = new Set<string>();
-    for (const c of pi.compositions) for (const s of c.sons) fichiers.add(s.fichier);
+    const parFichier = new Map<string, string[]>();
+    for (const c of pi.compositions)
+      for (const s of c.sons) {
+        fichiers.add(s.fichier);
+        const noms = (s.fiche?.effets ?? []).map((e) => e.nom);
+        if (noms.length) parFichier.set(s.fichier, noms);
+      }
     suivant.set(pi.ip, fichiers);
+    effets.set(pi.ip, parFichier);
   }
   sonsParIp = suivant;
+  effetsParIp = effets;
+}
+
+/** Les effets appliqués au son lié à une région (sa fiche sur le Pi) ; vide : son sec ou inconnu. */
+export function effetsDuSon(ip: string | undefined, region: { sonNumber: number | null; nomFichier: string }): string[] {
+  if (!ip) return [];
+  const fichier = region.sonNumber !== null ? `son${region.sonNumber}.wav` : region.nomFichier;
+  return effetsParIp.get(ip)?.get(fichier) ?? [];
 }
 
 export function noterSections(modules: { ip: string; section: string }[]): void {

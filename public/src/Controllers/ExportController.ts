@@ -172,6 +172,23 @@ export default class ExporterController {
     }
 
     /**
+     * Une région passée par toute la chaîne de sa piste (effets compris), sur sa seule durée :
+     * le son « avec l'effet appliqué » qu'on envoie à un Pi. La queue d'un effet (réverbération)
+     * au-delà de la fin de la région est coupée.
+     */
+    public async exportRegionAvecEffetsToWaveBlob(track: Track, startMs: number, durationMs: number): Promise<Blob> {
+        const { default: initializeWamHost } = await import("@webaudiomodules/sdk/src/initializeWamHost");
+        const offlineCtx = new OfflineAudioContext(2, Math.max(1, Math.round(audioCtx.sampleRate * durationMs / 1000)), audioCtx.sampleRate)
+        const [hostGroupId] = await initializeWamHost(offlineCtx)
+        const graph = await track.track_graph.instantiate(offlineCtx, hostGroupId)
+        graph.connect(offlineCtx.destination)
+        await graph.playEfficiently(startMs, durationMs)
+        const rendu = await offlineCtx.startRendering()
+        await graph.dispose()
+        return bufferToWave(rendu)
+    }
+
+    /**
      * Export a given audio buffer as a WAV file.
      *
      * @param buffer - Audio buffer to export.

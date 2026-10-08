@@ -12,8 +12,10 @@ export type MenuRegion =
       titre: string;
       /** Le premier numéro libre et les numéros déjà présents sur le Pi (null : liste illisible). */
       proposer: () => Promise<{ numero: number; pris: Set<number> | null; remarque?: string }>;
+      /** Les effets (FX) de la piste, à nommer à côté de « Appliquer l'effet » ; vide : pas de case. */
+      effets: string[];
       /** Lance l'envoi ; `lireStatut` est relu pendant l'envoi pour l'afficher. */
-      envoyer: (numero: number) => Promise<{ ok: boolean; message: string }>;
+      envoyer: (numero: number, appliquerEffet: boolean) => Promise<{ ok: boolean; message: string }>;
       lireStatut: () => string | undefined;
     };
 
@@ -91,6 +93,22 @@ export function ouvrirMenuRegion(x: number, y: number, menu: MenuRegion): void {
     note.innerText = "Recherche du premier numéro libre…";
     boite.appendChild(note);
 
+    // Le son passé par les effets de la piste (sa fiche sur le Pi le dira), ou le son sec.
+    const caseEffet = document.createElement("input");
+    caseEffet.type = "checkbox";
+    if (menu.effets.length) {
+      const ligneEffet = document.createElement("label");
+      ligneEffet.style.display = "flex";
+      ligneEffet.style.alignItems = "center";
+      ligneEffet.style.gap = "6px";
+      ligneEffet.style.marginTop = "6px";
+      ligneEffet.style.cursor = "pointer";
+      const texteEffet = document.createElement("span");
+      texteEffet.innerText = `Appliquer l'effet de la piste (${menu.effets.join(" → ")})`;
+      ligneEffet.append(caseEffet, texteEffet);
+      boite.appendChild(ligneEffet);
+    }
+
     const statut = document.createElement("div");
     statut.style.marginTop = "8px";
     statut.style.whiteSpace = "pre-wrap";
@@ -156,7 +174,9 @@ export function ouvrirMenuRegion(x: number, y: number, menu: MenuRegion): void {
       const suivi = window.setInterval(() => {
         statut.innerText = menu.lireStatut() ?? "Envoi…";
       }, 200);
-      const resultat = await menu.envoyer(numero);
+      caseEffet.disabled = true;
+      const resultat = await menu.envoyer(numero, caseEffet.checked);
+      caseEffet.disabled = false;
       window.clearInterval(suivi);
       envoiEnCours = false;
       annuler.disabled = false;

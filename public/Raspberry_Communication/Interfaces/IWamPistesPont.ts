@@ -1,3 +1,22 @@
+/**
+ * Un effet de la chaîne FX d'une piste, tel qu'on le note dans la fiche d'un son envoyé avec
+ * l'effet appliqué : de quoi retrouver exactement la pédale et ses réglages.
+ */
+export type EffetDecrit = {
+  /** Le nom à afficher (« Greyhole »). */
+  nom: string;
+  /** L'identifiant WAM de la pédale (celui du pedalboard, ou du descripteur du plugin). */
+  wamId: string;
+  /** La bibliothèque de pédales d'où elle vient (pedalboard), ou l'adresse du plugin. */
+  source?: string;
+  fabricant?: string;
+  version?: string;
+  /** Sa place dans la chaîne (0 : la première). */
+  position: number;
+  /** L'état complet de ses paramètres (getState). */
+  etat: unknown;
+};
+
 import type { RaspberryTrackBinding } from "../Models/RaspberryTrackBinding";
 import type { EntreeRegionSonPersiste } from "../Services/RaspberryRegionSonStore";
 
@@ -30,6 +49,12 @@ export interface IWamPistesPont {
 
   /** Une région audio en WAV (null si elle n'existe pas ou n'est pas audio). */
   exporterRegionAudio(trackId: number, regionId: number): Blob | null;
+
+  /** La même, passée par les effets (FX) de sa piste. */
+  exporterRegionAvecEffets(trackId: number, regionId: number): Promise<Blob | null>;
+
+  /** Les effets (FX) d'une piste, identifiés exactement, avec l'état de leurs paramètres. */
+  decrireEffetsPiste(trackId: number): Promise<EffetDecrit[]>;
 
   /** Clic droit sur une région de l'arrangeur (coordonnées de la fenêtre). Rend le désabonnement. */
   abonnerClicDroitRegion(

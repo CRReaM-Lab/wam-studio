@@ -17,6 +17,8 @@ export type SonInventaire = {
   bits: number;
   duree: number;
   avertissements: string[];
+  /** La fiche du son (`sonN.json` sur le Pi) : origine, effets appliqués ; null : inconnue. */
+  fiche?: { origine?: string; effets?: { nom: string; wamId: string }[] } | null;
 };
 
 export type PiInventaire = {

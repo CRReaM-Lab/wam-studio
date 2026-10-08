@@ -2,7 +2,7 @@ import App from "../../src/App";
 import OperableAudioBuffer from "../../src/Audio/OperableAudioBuffer";
 import type { ProjectData } from "../../src/Loader/Loader";
 import SampleRegion from "../../src/Models/Region/SampleRegion";
-import type { IWamPistesPont, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
+import type { EffetDecrit, IWamPistesPont, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
 import { creerBinding } from "../Models/RaspberryTrackBinding";
 import { appliquerIndicateurRaspberry } from "../Services/RaspberryIndicateurPisteUi";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
@@ -78,6 +78,39 @@ export default class WamPistesPontImpl implements IWamPistesPont {
   public exporterRegionAudio(trackId: number, regionId: number): Blob | null {
     const region = this.lireRegionsAudioOrdonnees(trackId).find((r) => r.id === regionId);
     return region ? region.save() : null;
+  }
+
+  public async exporterRegionAvecEffets(trackId: number, regionId: number): Promise<Blob | null> {
+    const track = this.app.tracksController.getTrackById(trackId);
+    const region = this.lireRegionsAudioOrdonnees(trackId).find((r) => r.id === regionId);
+    if (!track || !region) return null;
+    return this.app.exportController.exportRegionAvecEffetsToWaveBlob(track, region.start, region.duration);
+  }
+
+  public async decrireEffetsPiste(trackId: number): Promise<EffetDecrit[]> {
+    const plugin = this.app.tracksController.getTrackById(trackId)?.plugin;
+    if (!plugin) return [];
+    const descripteur = (plugin.instance as unknown as { descriptor?: Record<string, string> }).descriptor ?? {};
+    const etat = await plugin.getState();
+    // Le pedalboard : sa chaîne de pédales (wam_id de chacune, état), et la bibliothèque d'où elles viennent.
+    if (etat && Array.isArray(etat.plugins)) {
+      return (etat.plugins as { wam_id: string; state: unknown }[]).map((p, position) => ({
+        nom: String(p.wam_id).split(/[/:#]/).filter(Boolean).pop() ?? String(p.wam_id),
+        wamId: String(p.wam_id),
+        source: etat.library,
+        position,
+        etat: p.state,
+      }));
+    }
+    return [{
+      nom: descripteur.name ?? plugin.name,
+      wamId: descripteur.identifier ?? plugin.name,
+      source: descripteur.url,
+      fabricant: descripteur.vendor,
+      version: descripteur.version,
+      position: 0,
+      etat,
+    }];
   }
 
   public abonnerClicDroitRegion(
