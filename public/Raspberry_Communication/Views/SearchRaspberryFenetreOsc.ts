@@ -59,8 +59,16 @@ function noterHistorique(commande: string): string[] {
 }
 
 const STYLE = `
-#${ID_OVERLAY} .osc { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; height: 100%; box-sizing: border-box;
+#${ID_OVERLAY} .osc { display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
   font-family: "IBM Plex Sans", system-ui, sans-serif; color: #e6e8eb; }
+#${ID_OVERLAY} .haut { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 8px; border-bottom: 1px solid #262a31; }
+#${ID_OVERLAY} .liste { flex: 1; min-height: 0; overflow: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+#${ID_OVERLAY} .liste > * { flex: 0 0 auto; }
+#${ID_OVERLAY} .liste .titre { margin-top: 10px; }
+#${ID_OVERLAY} .api { white-space: normal; display: grid; grid-template-columns: minmax(0, 1fr); text-align: left; gap: 2px; padding: 6px 10px; }
+#${ID_OVERLAY} .api code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; color: #f2f3f5; }
+#${ID_OVERLAY} .api span { font-size: 12px; color: #9aa1ab; }
+
 #${ID_OVERLAY} select, #${ID_OVERLAY} input { font: inherit; font-size: 14px; background: #111316; color: #e6e8eb;
   border: 1px solid #262a31; border-radius: 6px; padding: 8px; min-height: 40px; box-sizing: border-box; }
 #${ID_OVERLAY} input.commande { font-family: "IBM Plex Mono", ui-monospace, monospace; flex: 1; min-width: 0; }
@@ -77,12 +85,33 @@ const STYLE = `
 #${ID_OVERLAY} .historique button { text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace; }
 `;
 
-/** Les commandes préparées : le texte mis dans le champ (on complète ou on envoie). */
-const PREPAREES: { groupe: string; commandes: string[] }[] = [
-  { groupe: "Sons", commandes: ["/play 500 75", "/stop -1", "/level 75"] },
-  { groupe: "Pièce", commandes: ["/cue 1", "/composition 1", "/volume 100", "/mute 0"] },
-  { groupe: "Effets (inserts)", commandes: ["/fx canaux 1", "/fx 1 charge greyhole", "/fx 1 vide", "/fx 1 bypass 1"] },
-  { groupe: "Synthé (composition faust)", commandes: ["/note 60 100", "/note 60 0", "/synth tous ON 1", "/synth 1 gate 0", "/synth note 60 gate 0"] },
+/**
+ * L'API OSC d'un module pré : seulement les messages vérifiés en exécution (les autres, lus dans
+ * les patchs, sont dans notes/skini-osc.md de CRReaM-dev-root, à vérifier avant d'entrer ici).
+ * `exemple` va dans le champ.
+ */
+type MessageApi = { exemple: string; forme: string; doc: string };
+const API: { groupe: string; messages: MessageApi[] }[] = [
+  { groupe: "Module", messages: [
+    { exemple: "/composition 1", forme: "/composition <n>", doc: "charge la composition n de config.json (à partir de 0) ; hors liste : rien" },
+    { exemple: "/cue 1", forme: "/cue <n>", doc: "cue n, relayée à la composition (init_track : cue_param)" },
+  ] },
+  { groupe: "Effets (inserts, 4 emplacements)", messages: [
+    { exemple: "/fx canaux 1", forme: "/fx canaux 1|2", doc: "chaîne mono ou stéréo" },
+    { exemple: "/fx 1 charge greyhole", forme: "/fx <n> charge <pédale>", doc: "met la pédale dans l'emplacement n (inconnue : rien ne change)" },
+    { exemple: "/fx 1 vide", forme: "/fx <n> vide", doc: "retire la pédale de l'emplacement" },
+    { exemple: "/fx 1 bypass 1", forme: "/fx <n> bypass 0|1", doc: "contourne l'emplacement (fondu de 20 ms)" },
+    { exemple: "/fx 1 feedback 0.3", forme: "/fx <n> <paramètre> <valeur>", doc: "règle la pédale (la fin de son chemin Faust)" },
+  ] },
+  { groupe: "Skini (lecteur de sons)", messages: [
+    { exemple: "/play 500 75", forme: "/play <son> <gain>", doc: "joue sonN.wav (500 et plus : sons de WAM)" },
+  ] },
+  { groupe: "Synthé (composition faust)", messages: [
+    { exemple: "/note 60 100", forme: "/note <hauteur> <vélocité>", doc: "joue une note ; vélocité 0 : la relâche" },
+    { exemple: "/synth tous ON 1", forme: "/synth tous <paramètre> <valeur>", doc: "toutes les voix (gardé pour la suite)" },
+    { exemple: "/synth 1 gate 0", forme: "/synth <voix> <paramètre> <valeur>", doc: "une voix (1 à n)" },
+    { exemple: "/synth note 60 gate 0", forme: "/synth note <hauteur> <paramètre> <valeur>", doc: "la voix qui joue cette note" },
+  ] },
 ];
 
 export function ouvrirOngletOsc(params: {
@@ -98,9 +127,14 @@ export function ouvrirOngletOsc(params: {
   }
   const overlay = document.createElement("div");
   overlay.id = ID_OVERLAY;
+  const cadre = document.createElement("div");
+  cadre.className = "osc";
+  overlay.appendChild(cadre);
   const fenetre = document.createElement("div");
-  fenetre.className = "osc";
-  overlay.appendChild(fenetre);
+  fenetre.className = "haut";
+  const liste_ = document.createElement("div");
+  liste_.className = "liste";
+  cadre.append(fenetre, liste_);
 
   const choix = document.createElement("select");
   choix.setAttribute("aria-label", "À qui envoyer");
@@ -182,32 +216,36 @@ export function ouvrirOngletOsc(params: {
     }
   });
 
-  for (const g of PREPAREES) {
-    const t = document.createElement("div");
-    t.className = "titre";
-    t.textContent = g.groupe;
-    const zone = document.createElement("div");
-    zone.className = "boutons";
-    for (const c of g.commandes) {
-      const b = document.createElement("button");
-      b.textContent = c;
-      b.title = "Mettre dans le champ (Entrée pour envoyer)";
-      b.addEventListener("click", () => {
-        champ.value = c;
-        champ.focus();
-        // Le curseur sur le dernier argument, celui qu'on change le plus souvent.
-        const i = c.lastIndexOf(" ");
-        if (i > 0) champ.setSelectionRange(i + 1, c.length);
-      });
-      zone.appendChild(b);
-    }
-    fenetre.append(t, zone);
-  }
+  // La liste qui défile : les derniers envois, puis l'API.
   const titreHist = document.createElement("div");
   titreHist.className = "titre";
   titreHist.textContent = "Derniers envois";
-  fenetre.append(titreHist, historique);
+  liste_.append(titreHist, historique);
   montrerHistorique(lireHistorique());
+  for (const g of API) {
+    const t = document.createElement("div");
+    t.className = "titre";
+    t.textContent = g.groupe;
+    liste_.appendChild(t);
+    for (const m of g.messages) {
+      const b = document.createElement("button");
+      b.className = "api";
+      b.title = `Mettre « ${m.exemple} » dans le champ (Entrée pour envoyer)`;
+      const code = document.createElement("code");
+      code.textContent = m.forme;
+      const doc = document.createElement("span");
+      doc.textContent = m.doc;
+      b.append(code, doc);
+      b.addEventListener("click", () => {
+        champ.value = m.exemple;
+        champ.focus();
+        // Le curseur sur le dernier argument, celui qu'on change le plus souvent.
+        const i = m.exemple.lastIndexOf(" ");
+        if (i > 0) champ.setSelectionRange(i + 1, m.exemple.length);
+      });
+      liste_.appendChild(b);
+    }
+  }
 
   monterFenetre(overlay);
   champ.focus();
