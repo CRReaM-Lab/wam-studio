@@ -104,6 +104,7 @@ import { listerRaspberriesEnLigne } from "../Services/RaspberrySequenceurOscServ
 import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPanneauOscPlay";
 import { installerPanneauPiSon } from "../Views/PanneauPiSon";
 import { ouvrirOngletOsc } from "../Views/SearchRaspberryFenetreOsc";
+import { ouvrirOngletPlan } from "../Views/SearchRaspberryFenetrePlan";
 import { extraireNumeroSonOscDepuisFichier, OSC_PLAY_NIVEAU_DEFAUT } from "../utils/osc/OscPlayHelpers";
 import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
 import { couleurSection, sectionDe, suivreEtatsEnvoi } from "../Services/RaspberryEtatEnvoiRegions";
@@ -192,6 +193,7 @@ export default class SearchRaspberryController {
     });
     installerPanneauPiSon({
       onglets: [
+        { nom: "Plan", idFenetre: "raspberry-plan-overlay", ouvrir: () => ouvrirOngletPlan() },
         { nom: "Envoyer", idFenetre: "raspberry-send-audio-overlay", ouvrir: () => this.ouvrirFenetreEnvoiAudio() },
         { nom: "Sons du Pi", idFenetre: "raspberry-import-audio-overlay", ouvrir: () => this.ouvrirFenetreImportAudio() },
         { nom: "OSC", idFenetre: "raspberry-osc-overlay", ouvrir: () => this.ouvrirOngletOsc() },

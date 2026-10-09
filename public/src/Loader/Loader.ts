@@ -11,6 +11,7 @@ import { appliquerIndicateurRaspberry } from "../../Raspberry_Communication/Serv
 import { raspberryTrackBindingStore } from "../../Raspberry_Communication/Services/RaspberryTrackBindingStore";
 import { declencherSynchronisationPistesRaspberry } from "../../Raspberry_Communication/Services/RaspberryPisteSynchronisation";
 import { ecrireMarqueursSequenceur, lireMarqueursSequenceur } from "../../Raspberry_Communication/Services/RaspberryMarqueursStore";
+import { type AffectationCompositions, affectationVide, ecrireAffectationCompositions, lireAffectationBrute, lireAffectationCompositions } from "../../Raspberry_Communication/Services/RaspberryCompositionsStore";
 import type { MarqueurSequenceur } from "../../Raspberry_Communication/Models/MarqueurSequenceur";
 import { exporterRegionsSonsProjet } from "../../Raspberry_Communication/Services/RaspberryProjetRegionsSons";
 import { CURRENT_PROJECT_VERSION, metaASauver, migrerProjet, type MetaProjet, type MigrationConsignee } from "./ProjectFormat";
@@ -91,6 +92,8 @@ export interface ProjectData {
     marqueurs?: MarqueurSequenceur[];
     /** Par fichier de région audio : son Pi et son numéro de son (absent des projets d'avant). */
     regionsSons?: Record<string, EntreeRegionSonPersiste>;
+    /** Ce que joue chaque module (composition par module, section, défaut) ; absent : celle du parc. */
+    compositions?: AffectationCompositions;
     /** Création, dernière sauvegarde, et migrations appliquées (depuis la version 1.3). */
     meta?: MetaProjet;
 }
@@ -194,6 +197,7 @@ export default class Loader {
             },
             tracks: tracks,
             marqueurs: lireMarqueursSequenceur(),
+            compositions: lireAffectationCompositions(),
         }
         project.regionsSons = exporterRegionsSonsProjet(project)
         project.meta = metaASauver(this.metaChargee, this.migrationsAuChargement)
@@ -229,6 +233,8 @@ export default class Loader {
         // Les marqueurs viennent du projet ; un projet d'avant n'en a pas : ceux du navigateur
         // restent, et partiront avec lui à la prochaine sauvegarde.
         if (Array.isArray(project.marqueurs)) ecrireMarqueursSequenceur(project.marqueurs)
+        // Les compositions sont celles du projet : un projet d'avant n'en dit rien (celle du parc).
+        ecrireAffectationCompositions(project.compositions ? lireAffectationBrute(project.compositions) : affectationVide())
         if (project.regionsSons && typeof project.regionsSons === "object") remplacerRegionsSons(project.regionsSons)
         this._app.host.playhead = 0
         this._app.host.volume=project.host.volume

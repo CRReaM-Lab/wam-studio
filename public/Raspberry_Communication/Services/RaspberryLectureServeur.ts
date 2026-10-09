@@ -12,9 +12,8 @@ import { lireCueEnAttente } from "./RaspberryMarqueursCueEtat";
 import { parserAdresseOscPersonnalisee } from "./RaspberryMarqueursSequenceur";
 import { lireMarqueursSequenceur } from "./RaspberryMarqueursStore";
 import type { EvenementSequenceurOsc } from "./RaspberrySequenceurOscService";
+import { lireAffectationCompositions } from "./RaspberryCompositionsStore";
 
-/** La composition jouée par les pistes « rasp N » : skini, index 1 de config.json (mesuré). */
-export const COMPOSITION_SKINI = 1;
 
 const INTERVALLE_SURVEILLANCE_MS = 30;
 
@@ -78,7 +77,8 @@ export function demarrerLectureServeur(params: {
       params.envoyer({
         type: "programmeLancer",
         depuisMs: Math.round(positionArret),
-        composition: COMPOSITION_SKINI,
+        // Le serveur la traduit en /composition N pour chaque Pi (Programme.fs).
+        affectation: lireAffectationCompositions(),
         evenements: construireProgrammeServeur(params.regions()),
       });
     } else {

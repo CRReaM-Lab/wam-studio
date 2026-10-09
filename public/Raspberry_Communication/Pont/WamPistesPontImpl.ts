@@ -1,3 +1,4 @@
+import { lireAffectationCompositions } from "../Services/RaspberryCompositionsStore";
 import App from "../../src/App";
 import OperableAudioBuffer from "../../src/Audio/OperableAudioBuffer";
 import type { ProjectData } from "../../src/Loader/Loader";
@@ -568,7 +569,7 @@ export default class WamPistesPontImpl implements IWamPistesPont {
   }
 
   public lireSignaturePistes(): string {
-    return this.app.tracksController.tracks
+    const pistes = this.app.tracksController.tracks
       .map((track) => {
         const regions = track.regions
           .map((region) => `${region.id}:${region.start}:${region.duration}`)
@@ -576,6 +577,8 @@ export default class WamPistesPontImpl implements IWamPistesPont {
         return `${track.id}:${track.element.name}:${regions}`;
       })
       .join("|");
+    // Sans pistes, rien à sauver ; avec, changer les compositions du projet suffit à le sauver.
+    return pistes && `${pistes}#${JSON.stringify(lireAffectationCompositions())}`;
   }
 
   public async exporterSessionLocale(): Promise<SessionProjetLocale | null> {
