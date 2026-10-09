@@ -98,9 +98,9 @@ const API: { groupe: string; messages: MessageApi[] }[] = [
   ] },
   { groupe: "Effets (inserts, 4 emplacements)", messages: [
     { exemple: "/fx canaux 1", forme: "/fx canaux 1|2", doc: "chaîne mono ou stéréo" },
-    { exemple: "/fx 1 charge greyhole", forme: "/fx <n> charge <pédale>", doc: "met la pédale dans l'emplacement n (inconnue : rien ne change)" },
-    { exemple: "/fx 1 vide", forme: "/fx <n> vide", doc: "retire la pédale de l'emplacement" },
-    { exemple: "/fx 1 bypass 1", forme: "/fx <n> bypass 0|1", doc: "contourne l'emplacement (fondu de 20 ms)" },
+    { exemple: "/fx 1 charge greyhole", forme: "/fx <n> charge <pédale>", doc: "met la pédale dans l'emplacement n ; déjà là ou inconnue : rien ne change (on peut renvoyer tout l'état)" },
+    { exemple: "/fx 1 vide", forme: "/fx <n> vide", doc: "coupe l'entrée de la pédale et la retire 8 s plus tard : la queue s'éteint" },
+    { exemple: "/fx 1 bypass 1", forme: "/fx <n> bypass 0|1", doc: "coupe (1) ou rouvre (0) l'entrée de la pédale ; la queue s'éteint" },
     { exemple: "/fx 1 feedback 0.3", forme: "/fx <n> <paramètre> <valeur>", doc: "règle la pédale (la fin de son chemin Faust)" },
   ] },
   { groupe: "Skini (lecteur de sons)", messages: [
