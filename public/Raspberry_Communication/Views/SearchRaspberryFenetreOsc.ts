@@ -112,6 +112,11 @@ const API: { groupe: string; messages: MessageApi[] }[] = [
     { exemple: "/synth 1 gate 0", forme: "/synth <voix> <paramètre> <valeur>", doc: "une voix (1 à n)" },
     { exemple: "/synth note 60 gate 0", forme: "/synth note <hauteur> <paramètre> <valeur>", doc: "la voix qui joue cette note" },
   ] },
+  { groupe: "Soundfont (composition soundfont)", messages: [
+    { exemple: "/note 60 100", forme: "/note <hauteur> <vélocité> [canal]", doc: "joue une note ; vélocité 0 : la relâche" },
+    { exemple: "/pgm 40", forme: "/pgm <programme>", doc: "change d'instrument (General MIDI : 0 piano, 40 violon)" },
+    { exemple: "/panic", forme: "/panic", doc: "coupe toutes les notes" },
+  ] },
 ];
 
 export function ouvrirOngletOsc(params: {
