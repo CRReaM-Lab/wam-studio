@@ -583,7 +583,8 @@ export default class WamPistesPontImpl implements IWamPistesPont {
       })
       .join("|");
     // Sans pistes, rien à sauver ; avec, changer les compositions du projet suffit à le sauver.
-    return pistes && `${pistes}#${JSON.stringify(lireAffectationCompositions())}`;
+    const fx = raspberryTrackBindingStore.tous().filter((b) => b.fxDirect).map((b) => b.trackId);
+    return pistes && `${pistes}#${JSON.stringify(lireAffectationCompositions())}#fx${fx.join(",")}`;
   }
 
   public async exporterSessionLocale(): Promise<SessionProjetLocale | null> {

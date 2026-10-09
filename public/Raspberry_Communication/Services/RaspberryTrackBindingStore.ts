@@ -78,6 +78,7 @@ class RaspberryTrackBindingStore {
       raspberryId: binding.raspberryId,
       sonNumber: binding.sonNumber,
       liee: binding.liee !== false,
+      ...(binding.fxDirect ? { fxDirect: true } : {}),
     };
   }
 

@@ -93,6 +93,8 @@ import { ouvrirFenetreSuppressionAudio } from "../Views/SearchRaspberryFenetreSu
 import { ouvrirFenetreImportAudio } from "../Views/SearchRaspberryFenetreImportAudio";
 import { ouvrirMenuRegion } from "../Views/SearchRaspberryMenuRegion";
 import { demarrerLectureServeur } from "../Services/RaspberryLectureServeur";
+import { demarrerSynchroEffets } from "../Services/RaspberrySynchroEffets";
+import { EMPLACEMENTS_FX, etatEffetsModule } from "../Services/RaspberryEffetsModule";
 import { ecrireCueEnAttente, lireCueEnAttente } from "../Services/RaspberryMarqueursCueEtat";
 import { lireMarqueursSequenceur } from "../Services/RaspberryMarqueursStore";
 import { actualiserBandeauCuePiste } from "../Services/RaspberryMarqueursPisteUi";
@@ -308,6 +310,14 @@ export default class SearchRaspberryController {
             brancherEditionMarqueursPiste(pont);
             demarrerCueLecturePistes(pont);
             demarrerOscLecturePistes(pont);
+            // Les réglages des effets des pistes « FX » suivis en direct sur leur module.
+            demarrerSynchroEffets({
+              pont,
+              liaisons: () => raspberryTrackBindingStore.tous(),
+              enLigne: (ip) => this.state.raspberryMap.get(ip)?.isOnline === true,
+              envoyer: (ip, valeur) =>
+                this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: valeur }),
+            });
             // Une seule lecture : Play dans WAM joue aussi sur les Pi, par le serveur.
             demarrerLectureServeur({
               pont,
@@ -796,34 +806,16 @@ export default class SearchRaspberryController {
    * restants vidés. Rend le compte rendu à afficher.
    */
   private chargerEffetsSurModule(ip: string, effets: EffetDecrit[]): string {
-    const EMPLACEMENTS = 4;
-    const messages: string[] = [];
-    const sautees: string[] = [];
-    effets.slice(0, EMPLACEMENTS).forEach((e, i) => {
-      const n = i + 1;
-      if (!e.objetPd) {
-        sautees.push(e.nom);
-        messages.push(`${n} vide`);
-        return;
-      }
-      messages.push(`${n} charge ${e.objetPd}`);
-      for (const [adresse, valeur] of Object.entries((e.etat ?? {}) as Record<string, unknown>)) {
-        const parametre = adresse.split("/").filter(Boolean).pop();
-        const nombre = Number(valeur);
-        if (parametre && Number.isFinite(nombre)) messages.push(`${n} ${parametre} ${nombre}`);
-      }
-    });
-    for (let n = effets.length + 1; n <= EMPLACEMENTS; n++) messages.push(`${n} vide`);
-    for (const m of messages) {
+    const { emplacements, sautees, chargees } = etatEffetsModule(effets);
+    for (const m of emplacements.flat()) {
       if (!this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: m })) {
         return "WebSocket du serveur non connecté : effets non envoyés.";
       }
     }
-    const chargees = effets.slice(0, EMPLACEMENTS).filter((e) => e.objetPd).map((e) => e.objetPd);
     return (
       `Module ${ip} : ${chargees.length ? chargees.join(" → ") : "aucun effet"}.` +
       (sautees.length ? `\nSans équivalent sur le module : ${sautees.join(", ")}.` : "") +
-      (effets.length > EMPLACEMENTS ? `\nSeuls les ${EMPLACEMENTS} premiers effets tiennent dans les inserts.` : "")
+      (effets.length > EMPLACEMENTS_FX ? `\nSeuls les ${EMPLACEMENTS_FX} premiers effets tiennent dans les inserts.` : "")
     );
   }
 

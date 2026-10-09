@@ -86,6 +86,9 @@ export interface ProjectData {
             ip: string;
             raspberryId: number;
             sonNumber: number;
+            liee?: boolean;
+            /** Les réglages des effets suivis en direct sur le module. */
+            fxDirect?: boolean;
         };
     }[];
     /** Marqueurs OSC et cues de la timeline (absents des projets d'avant : on garde ceux du navigateur). */

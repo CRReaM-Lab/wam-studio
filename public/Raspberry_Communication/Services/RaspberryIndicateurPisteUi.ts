@@ -11,6 +11,7 @@ import {
 
 const ATTR_RASPBERRY_LIE = "data-raspberry-lie";
 const ATTR_CASE_LIAISON = "data-raspberry-case-liaison";
+const ATTR_BOUTON_FX = "data-raspberry-fx-direct";
 const STYLE_BORDURE_LIE = "4px solid #1f8b4c";
 const STYLE_BORDURE_DELIE = "4px solid #6b7280";
 
@@ -36,6 +37,7 @@ export function appliquerIndicateurRaspberry(
   binding: RaspberryTrackBinding
 ): void {
   assurerCaseLiaison(piste.element, binding);
+  assurerBoutonFx(piste.element, binding);
   appliquerEtatLiaison(piste, binding);
 }
 
@@ -61,6 +63,7 @@ export function retirerIndicateurRaspberry(piste: ElementPiste): void {
   element.title = "";
   retirerProtectionNomPiste(piste);
   element.shadowRoot?.querySelector(`[${ATTR_CASE_LIAISON}]`)?.remove();
+  element.shadowRoot?.querySelector(`[${ATTR_BOUTON_FX}]`)?.remove();
 }
 
 export function texteStatutLiaisonPiste(binding: RaspberryTrackBinding): string {
@@ -99,6 +102,7 @@ function appliquerEtatLiaison(piste: ElementPiste, binding: RaspberryTrackBindin
   if (coche && document.activeElement !== coche) {
     coche.checked = pisteEstLiee(binding);
   }
+  reglerBoutonFx(element.shadowRoot?.querySelector<HTMLButtonElement>(`[${ATTR_BOUTON_FX}]`), binding);
 
   if (pisteEstLiee(binding)) {
     element.setAttribute(ATTR_RASPBERRY_LIE, String(binding.raspberryId));
@@ -138,6 +142,51 @@ function reglerCase(
   if (!joignable) {
     coche.checked = false;
   }
+}
+
+/** « FX » allumé : les réglages des effets de la piste suivent en direct sur son module. */
+function reglerBoutonFx(bouton: HTMLButtonElement | null | undefined, binding: RaspberryTrackBinding): void {
+  if (!bouton) return;
+  bouton.style.display = pisteEstLiee(binding) ? "" : "none";
+  const actif = binding.fxDirect === true;
+  bouton.setAttribute("aria-pressed", String(actif));
+  bouton.style.background = actif ? "#1f8b4c" : "transparent";
+  bouton.style.color = actif ? "#fff" : "#9aa1ab";
+  bouton.title = actif
+    ? `Réglages des effets suivis en direct sur rasp ${binding.raspberryId} : toucher pour arrêter.`
+    : `Toucher pour suivre en direct les réglages des effets sur rasp ${binding.raspberryId}.`;
+}
+
+function assurerBoutonFx(element: HTMLElement, binding: RaspberryTrackBinding): void {
+  const racine = element.shadowRoot;
+  const champNom = racine?.getElementById("name-input") as HTMLInputElement | null;
+  if (!racine || !champNom?.parentElement) return;
+  let bouton = racine.querySelector<HTMLButtonElement>(`[${ATTR_BOUTON_FX}]`);
+  if (!bouton) {
+    bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.textContent = "FX";
+    bouton.setAttribute(ATTR_BOUTON_FX, "1");
+    bouton.setAttribute("aria-label", "Effets en direct sur le module");
+    Object.assign(bouton.style, {
+      marginLeft: "6px", flexShrink: "0", minWidth: "32px", height: "24px", padding: "0 6px",
+      border: "1px solid #1f8b4c", borderRadius: "6px", font: "600 11px system-ui, sans-serif",
+      cursor: "pointer", touchAction: "manipulation",
+    });
+    champNom.parentElement.insertBefore(bouton, champNom.nextSibling);
+    bouton.addEventListener("pointerdown", (event) => event.stopPropagation());
+    bouton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const trackId = Number(bouton?.getAttribute("data-track-id"));
+      const actuel = Number.isFinite(trackId) ? raspberryTrackBindingStore.trouverParTrackId(trackId) : undefined;
+      if (!actuel) return;
+      actuel.fxDirect = !actuel.fxDirect;
+      raspberryTrackBindingStore.enregistrer(actuel);
+      reglerBoutonFx(bouton, actuel);
+    });
+  }
+  bouton.setAttribute("data-track-id", String(binding.trackId));
+  reglerBoutonFx(bouton, binding);
 }
 
 function lireTrackIdCase(element: HTMLElement): number | null {

@@ -10,6 +10,8 @@ export type RaspberryTrackBinding = {
   sonNumber: number;
   /** false = piste deliee : nom libre, ignoree par le sequenceur OSC. */
   liee: boolean;
+  /** Les réglages des effets de la piste suivis en direct sur le module (/fx). */
+  fxDirect?: boolean;
 };
 
 export type RaspberryTrackBindingPersiste = {
@@ -17,6 +19,7 @@ export type RaspberryTrackBindingPersiste = {
   raspberryId: number;
   sonNumber: number;
   liee?: boolean;
+  fxDirect?: boolean;
 };
 
 export function creerBinding(
@@ -33,11 +36,8 @@ export function bindingDepuisPersiste(
   trackId: number,
   donnees: RaspberryTrackBindingPersiste
 ): RaspberryTrackBinding {
-  return creerBinding(
-    trackId,
-    donnees.ip,
-    donnees.raspberryId,
-    donnees.sonNumber ?? SON_NUMERO_DEFAUT,
-    donnees.liee !== false
-  );
+  return {
+    ...creerBinding(trackId, donnees.ip, donnees.raspberryId, donnees.sonNumber ?? SON_NUMERO_DEFAUT, donnees.liee !== false),
+    fxDirect: donnees.fxDirect === true,
+  };
 }
