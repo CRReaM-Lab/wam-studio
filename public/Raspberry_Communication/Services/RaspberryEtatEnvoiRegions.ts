@@ -12,7 +12,7 @@
  * - `inconnu`   : le Pi n'est pas inventorié (hors ligne, injoignable).
  *
  * L'inventaire vient du serveur (`GET <agent>/inventaire`), relu toutes les 10 s ; les sections
- * de `GET /api/maintenance` (fiches du parc).
+ * et leurs couleurs de `GET /api/maintenance` (l'implantation active, dessinée sur le plan de salle).
  */
 import type { Inventaire } from "../Views/SearchRaspberryFenetreInventaire";
 
@@ -30,6 +30,8 @@ let sonsParIp = new Map<string, Set<string> | null>();
 /** Les effets appliqués à chaque son (d'après sa fiche), par Pi puis par fichier. */
 let effetsParIp = new Map<string, Map<string, string[]>>();
 let sectionsParIp = new Map<string, string>();
+/** Les couleurs des sections, données par l'implantation active (plan de salle du serveur). */
+let couleursSections = new Map<string, string>();
 
 export function noterInventaire(inventaire: Inventaire): void {
   const suivant = new Map<string, Set<string> | null>();
@@ -61,8 +63,12 @@ export function effetsDuSon(ip: string | undefined, region: { sonNumber: number 
   return effetsParIp.get(ip)?.get(fichier) ?? [];
 }
 
-export function noterSections(modules: { ip: string; section: string }[]): void {
+export function noterSections(
+  modules: { ip: string; section: string }[],
+  sections: { nom: string; couleur: string }[] = []
+): void {
   sectionsParIp = new Map(modules.filter((m) => m.section).map((m) => [m.ip, m.section]));
+  couleursSections = new Map(sections.filter((s) => s.couleur).map((s) => [s.nom, s.couleur]));
 }
 
 /** La section d'un Pi (parc, via la maintenance) ; null : réserve ou inconnue. */
@@ -74,6 +80,8 @@ export function sectionDe(ip: string): string | null {
 export function couleurSection(ip: string): string | null {
   const section = sectionsParIp.get(ip);
   if (!section) return null;
+  const choisie = couleursSections.get(section);
+  if (choisie) return choisie;
   const noms = [...new Set(sectionsParIp.values())].sort();
   return PALETTE_SECTIONS[noms.indexOf(section) % PALETTE_SECTIONS.length];
 }
@@ -104,7 +112,10 @@ export function suivreEtatsEnvoi(params: {
     if (r.ok) noterInventaire(r.inventaire);
     try {
       const reponse = await fetch("/api/maintenance");
-      if (reponse.ok) noterSections((await reponse.json()).modules ?? []);
+      if (reponse.ok) {
+        const j = await reponse.json();
+        noterSections(j.modules ?? [], j.sections ?? []);
+      }
     } catch {
       /* pas de serveur : pas de sections */
     }
