@@ -114,6 +114,10 @@ export default class Loader {
      *  prochaine sauvegarde les consigne. */
     private metaChargee: MetaProjet | undefined = undefined;
     private migrationsAuChargement: MigrationConsignee[] = [];
+    /** L'identité du projet ouvert (un projet d'avant n'en a pas : il en reçoit une). */
+    public idProjet: string = crypto.randomUUID();
+    /** Son nom sur le serveur de projets, une fois sauvé ou chargé de là. */
+    public nomProjet: string = "";
 
     constructor(app: App) {
         this._app = app;
@@ -201,6 +205,8 @@ export default class Loader {
         }
         project.regionsSons = exporterRegionsSonsProjet(project)
         project.meta = metaASauver(this.metaChargee, this.migrationsAuChargement)
+        project.meta.id = this.idProjet
+        if (this.nomProjet) project.meta.nom = this.nomProjet
         // Consignées une fois : les sauvegardes suivantes repartent de ces métadonnées.
         this.metaChargee = project.meta
         this.migrationsAuChargement = []
@@ -223,6 +229,8 @@ export default class Loader {
             }
             this.metaChargee = project.meta
             this.migrationsAuChargement = migration.migrations
+            this.idProjet = project.meta?.id || crypto.randomUUID()
+            this.nomProjet = project.meta?.nom || ""
             for (const m of migration.migrations) console.info(`[projet] migration ${m.de} → ${m.vers} : ${m.note}`)
         }
 

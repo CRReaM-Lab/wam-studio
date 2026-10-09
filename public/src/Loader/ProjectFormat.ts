@@ -18,6 +18,11 @@ export type MigrationConsignee = {
 };
 
 export type MetaProjet = {
+  /** L'identité du projet, gardée d'une sauvegarde à l'autre : la fiche des sons envoyés aux Pi
+   *  la porte, pour reconnaître un son d'un autre projet avant de l'écraser. */
+  id?: string;
+  /** Le nom sous lequel il a été sauvé sur le serveur de projets. */
+  nom?: string;
   /** Création : date, et version du format à ce moment. */
   creeLe?: string;
   formatInitial?: string;

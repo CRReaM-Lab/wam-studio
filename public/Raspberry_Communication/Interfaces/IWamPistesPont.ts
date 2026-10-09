@@ -42,6 +42,8 @@ export interface IWamPistesPont {
   focusPiste(trackId: number): void;
 
   lireNomPiste(trackId: number): string | undefined;
+  /** L'identité du projet ouvert (et son nom une fois sauvé), écrite dans la fiche des sons. */
+  lireProjet(): { id: string; nom?: string };
 
   exporterPisteVersWave(trackId: number): Promise<Blob | null>;
 

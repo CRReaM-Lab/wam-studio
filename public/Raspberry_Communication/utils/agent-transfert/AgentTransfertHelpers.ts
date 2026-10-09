@@ -26,6 +26,8 @@ export type TransfertFormulaire = TransfertDraft & {
   sonNumber?: number;
   /** La fiche du son, posée à côté de lui sur le Pi (origine, effets appliqués). */
   fiche?: Record<string, unknown>;
+  /** Remplacer un son déjà sur le Pi qui n'est pas à ce projet ou à cette piste (accord donné). */
+  remplacer?: boolean;
 };
 
 function lireSonNumber(formulaire: Pick<TransfertFormulaire, "sonNumber">): number {
@@ -262,5 +264,6 @@ export function construireCommandeStartTransfer(
   };
   commande.remotePath = apercuCheminComplet(formulaire, "export.wav");
   if (formulaire.fiche) commande.fiche = formulaire.fiche;
+  if (formulaire.remplacer) commande.remplacer = true;
   return commande;
 }

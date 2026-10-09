@@ -56,6 +56,11 @@ export default class WamPistesPontImpl implements IWamPistesPont {
     track.element.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  public lireProjet(): { id: string; nom?: string } {
+    const loader = this.app.loader;
+    return { id: loader.idProjet, ...(loader.nomProjet ? { nom: loader.nomProjet } : {}) };
+  }
+
   public lireNomPiste(trackId: number): string | undefined {
     const track = this.app.tracksController.getTrackById(trackId);
     return track?.element.name;

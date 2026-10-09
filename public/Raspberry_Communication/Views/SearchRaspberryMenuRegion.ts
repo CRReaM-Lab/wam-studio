@@ -160,7 +160,7 @@ export function ouvrirMenuRegion(x: number, y: number, menu: MenuRegion): void {
         note.innerText = "500 au minimum (1-499 : sons skini).";
       } else if (pris?.has(n)) {
         note.style.color = "#ffc46b";
-        note.innerText = `son${n}.wav est déjà sur le Pi : il sera remplacé.`;
+        note.innerText = `son${n}.wav est déjà sur le Pi : remplacé s'il vient de cette piste, sinon on demande.`;
       } else {
         note.innerText = `→ son${n}.wav${remarque ? ` (${remarque})` : ""}`;
       }

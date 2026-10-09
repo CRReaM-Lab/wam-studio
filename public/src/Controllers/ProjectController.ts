@@ -159,6 +159,7 @@ export default class ProjectController {
             return;
         }
 
+        this._app.loader.nomProjet = name;
         let [project,contents] = await this._app.loader.saveProject();
 
         // Upload the project file

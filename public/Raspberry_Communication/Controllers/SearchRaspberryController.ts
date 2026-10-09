@@ -105,6 +105,7 @@ import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPa
 import { installerPanneauPiSon } from "../Views/PanneauPiSon";
 import { ouvrirOngletOsc } from "../Views/SearchRaspberryFenetreOsc";
 import { ouvrirOngletPlan } from "../Views/SearchRaspberryFenetrePlan";
+import { demanderRemplacement } from "../Views/DemandeRemplacement";
 import { extraireNumeroSonOscDepuisFichier, OSC_PLAY_NIVEAU_DEFAUT } from "../utils/osc/OscPlayHelpers";
 import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
 import { couleurSection, sectionDe, suivreEtatsEnvoi } from "../Services/RaspberryEtatEnvoiRegions";
@@ -154,6 +155,8 @@ export default class SearchRaspberryController {
       onEvenement: (event) => this.traiterEvenementTransfert(event),
       onErreur: (message) => this.signalerErreurTransfert(message),
       onJournal: (message) => logTransfertInfo(message),
+      projet: () => this.pontPistes?.lireProjet(),
+      confirmerRemplacement: (message, existante) => demanderRemplacement(message, existante),
     });
     this.suppressionAudio = new RaspberrySuppressionAudioService(
       async (ip) => {

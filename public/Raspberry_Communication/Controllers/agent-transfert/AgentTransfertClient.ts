@@ -32,6 +32,8 @@ export type EvenementTransfertUi = {
   speed?: number;
   remainingSeconds?: number;
   message?: string;
+  /** Sur un refus d'écraser (`error`) : la fiche du son déjà sur le Pi (vide : sans fiche). */
+  conflit?: Record<string, unknown>;
 };
 
 export type CallbacksTransfertUi = {
@@ -39,7 +41,13 @@ export type CallbacksTransfertUi = {
   onEvenement: (event: EvenementTransfertUi) => void;
   onErreur: (message: string) => void;
   onJournal?: (message: string) => void;
+  /** Le projet ouvert, écrit dans la fiche de chaque son envoyé. */
+  projet?: () => { id: string; nom?: string } | undefined;
+  /** Un son du Pi n'est pas à ce projet ou à cette piste : le remplacer ? Absent : non. */
+  confirmerRemplacement?: (message: string, existante: Record<string, unknown>) => Promise<boolean>;
 };
+
+type ResultatEnvoi = { ok: true } | { ok: false; error: string; conflit?: Record<string, unknown> };
 
 /** Une ligne du plan d'un lot (`POST <agent>/lot/plan`, Lot.fs du serveur). */
 export type LignePlanLot = {
@@ -369,6 +377,10 @@ export default class AgentTransfertClient {
     this.callbacks.onConnexionChange(false);
   }
 
+  /**
+   * Envoie un son au Pi. S'il y en a déjà un sous ce nom qui n'est pas à ce projet ou à cette
+   * piste, le serveur refuse : on demande (`confirmerRemplacement`) et on relance avec l'accord.
+   */
   public async envoyerFichierComplet(
     fichier: File,
     formulaire: TransfertFormulaire
@@ -378,11 +390,20 @@ export default class AgentTransfertClient {
       this.callbacks.onErreur(validation.error);
       return { ok: false, error: validation.error };
     }
-    return this.executerEnvoi(
-      fichier,
-      (transferId) => construireEntetesUploadNommage(formulaire, transferId),
-      (transferId) => construireCommandeStartTransfer(formulaire, transferId)
-    );
+    const projet = this.callbacks.projet?.();
+    const avecProjet: TransfertFormulaire = projet ? { ...formulaire, fiche: { ...formulaire.fiche, projet } } : formulaire;
+    const envoyer = (f: TransfertFormulaire) =>
+      this.executerEnvoi(
+        fichier,
+        (transferId) => construireEntetesUploadNommage(f, transferId),
+        (transferId) => construireCommandeStartTransfer(f, transferId)
+      );
+    const resultat = await envoyer(avecProjet);
+    if (resultat.ok || !resultat.conflit || formulaire.remplacer || !this.callbacks.confirmerRemplacement) return resultat;
+    if (!(await this.callbacks.confirmerRemplacement(resultat.error, resultat.conflit))) {
+      return { ok: false, error: `${resultat.error} Gardé ; rien n'a été envoyé.` };
+    }
+    return envoyer({ ...avecProjet, remplacer: true });
   }
 
   /** Le plan d'un lot `son<son>-<Pi>.wav` : où irait chaque fichier, sans rien envoyer. */
@@ -424,7 +445,7 @@ export default class AgentTransfertClient {
     entetes: (transferId: string) => Record<string, string>,
     commandeDe: (transferId: string) => Record<string, unknown>,
     surEvenement?: (event: EvenementTransfertUi) => void
-  ): Promise<{ ok: true } | { ok: false; error: string }> {
+  ): Promise<ResultatEnvoi> {
     await this.connecter();
     if (!this.socket) {
       const erreur = "Connexion WebSocket à l'agent impossible.";
@@ -475,6 +496,11 @@ export default class AgentTransfertClient {
       if (fin.type === "completed" || fin.state === "COMPLETED") {
         this.journal("Transfert SCP termine avec succes.");
         return { ok: true };
+      }
+      if (fin.type === "error" && fin.conflit) {
+        // Pas une panne : une question, posée par l'appelant.
+        this.journal(`Non remplacé : ${fin.message}`);
+        return { ok: false, error: fin.message || "Son déjà sur le Pi.", conflit: fin.conflit };
       }
       if (fin.type === "error") {
         throw new Error(fin.message || "Erreur SCP.");
