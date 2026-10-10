@@ -19,7 +19,16 @@ const GRIS = "#9a9893";
 
 type Section = { nom: string; couleur: string; zone: { x: number; y: number; l: number; h: number } };
 type Implantation = { nom?: string; sections: Section[]; modules: Record<string, { x?: number; y?: number; section?: string }> };
-type ModuleParc = { numero: number; enLigne: boolean };
+type ModuleParc = {
+  numero: number;
+  ip: string;
+  enLigne: boolean;
+  /** L'état envoyé par le module : ses réglages audio en cours (crates/module, audio.rs). */
+  etat?: { pd?: { audio?: { tampon: number; frequence: number; bloc: number } } } | null;
+};
+
+/** Les tampons proposés pour Pd (ms) : 10 ms ne craque pas sur le module 33, 5 ms si. */
+const TAMPONS = [5, 10, 20, 50];
 type Cible = { type: "module"; numero: number; section: string } | { type: "section"; nom: string };
 
 const STYLE = `
@@ -214,6 +223,38 @@ export function ouvrirOngletPlan(): void {
     );
   };
 
+  /** Le tampon de Pd d'un module : changé sans relancer Pd (court silence), retenu par le module. */
+  const reglageTampon = (numero: number) => {
+    const bloc = el("div");
+    bloc.style.marginTop = "10px";
+    const m = modules.find((x) => x.numero === numero);
+    const audio = m?.etat?.pd?.audio;
+    bloc.append(el("div", audio ? `Tampon audio de Pd : ${audio.tampon} ms (${audio.frequence} Hz, bloc ${audio.bloc})` : "Tampon audio de Pd : inconnu (module hors ligne, ou sans le daemon module)", "aide"));
+    const ligne = el("div", "", "liste");
+    for (const t of TAMPONS) {
+      const b = el("button", `${t} ms`);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(audio?.tampon === t));
+      b.disabled = !m?.enLigne || !audio;
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const r = await fetch("/api/maintenance/audio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip: m!.ip, tampon: t }) });
+          const j = (await r.json()) as { ok: boolean; error?: string };
+          if (!j.ok) throw new Error(j.error);
+          // L'état du module arrive avec son battement suivant (4 s) ; on montre le choix tout de suite.
+          if (m?.etat?.pd?.audio) m.etat.pd.audio.tampon = t;
+        } catch (erreur) {
+          bloc.append(el("div", `Échec : ${erreur instanceof Error ? erreur.message : String(erreur)}`, "aide"));
+        }
+        rendre();
+      };
+      ligne.append(b);
+    }
+    bloc.append(ligne);
+    return bloc;
+  };
+
   const panneauChoix = (cible: Cible, affectation: ReturnType<typeof lireAffectationCompositions>) => {
     const boite = el("div", "", "choix");
     const actuelle = cible.type === "module" ? affectation.modules[String(cible.numero)] ?? "" : affectation.sections[cible.nom] ?? "";
@@ -244,6 +285,7 @@ export function ouvrirOngletPlan(): void {
     fermer.onclick = () => { choisi = null; rendre(); };
     liste.append(fermer);
     boite.append(liste);
+    if (cible.type === "module") boite.append(reglageTampon(cible.numero));
     return boite;
   };
 
