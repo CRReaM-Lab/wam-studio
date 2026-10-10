@@ -17,7 +17,8 @@ import {
 const ID_OVERLAY = "raspberry-plan-overlay";
 const GRIS = "#9a9893";
 
-type Section = { nom: string; couleur: string; zone: { x: number; y: number; l: number; h: number } };
+/** Une section : son identifiant fixe (`s1`…, Implantation.fs du serveur), son nom affiché. */
+type Section = { id: string; nom: string; couleur: string; zone: { x: number; y: number; l: number; h: number } };
 type Implantation = { nom?: string; sections: Section[]; modules: Record<string, { x?: number; y?: number; section?: string }> };
 type ModuleParc = {
   numero: number;
@@ -29,7 +30,9 @@ type ModuleParc = {
 
 /** Les tampons proposés pour Pd (ms) : 10 ms ne craque pas sur le module 33, 5 ms si. */
 const TAMPONS = [5, 10, 20, 50];
-type Cible = { type: "module"; numero: number; section: string } | { type: "section"; nom: string };
+type Cible =
+  | { type: "module"; numero: number; section: { id: string; nom: string } | null }
+  | { type: "section"; id: string; nom: string };
 
 const STYLE = `
 #${ID_OVERLAY} .plan-wam { position: relative; width: 100%; aspect-ratio: 16 / 10; border: 1px solid #333a43;
@@ -122,7 +125,8 @@ export function ouvrirOngletPlan(): void {
   const rendre = () => {
     const affectation = lireAffectationCompositions();
     const abr = abreviations(compositions);
-    const couleur = (section: string) => impl.sections.find((s) => s.nom === section)?.couleur ?? GRIS;
+    const sectionPar = (id: string) => impl.sections.find((s) => s.id === id);
+    const couleur = (id: string) => sectionPar(id)?.couleur ?? GRIS;
     corps.replaceChildren();
 
     // La composition par défaut du projet.
@@ -145,13 +149,13 @@ export function ouvrirOngletPlan(): void {
         left: `${s.zone.x * 100}%`, top: `${s.zone.y * 100}%`, width: `${s.zone.l * 100}%`, height: `${s.zone.h * 100}%`,
         borderColor: s.couleur, color: s.couleur, background: `${s.couleur}14`,
       });
-      if (choisi?.type === "section" && choisi.nom === s.nom) z.style.borderStyle = "solid";
+      if (choisi?.type === "section" && choisi.id === s.id) z.style.borderStyle = "solid";
       const b = el("button");
       b.type = "button";
       b.append(document.createTextNode(s.nom));
-      const propre = affectation.sections[s.nom];
+      const propre = affectation.sections[s.id] ?? affectation.sections[s.nom];
       b.append(el("span", propre ? `joue ${propre}` : "toucher : sa composition", "compo"));
-      b.onclick = () => { choisi = { type: "section", nom: s.nom }; rendre(); };
+      b.onclick = () => { choisi = { type: "section", id: s.id, nom: s.nom }; rendre(); };
       z.append(b);
       plan.append(z);
     }
@@ -169,15 +173,16 @@ export function ouvrirOngletPlan(): void {
     for (const m of modules) {
       const place = impl.modules[String(m.numero)];
       const section = place?.section ?? "";
-      const c = compositionDuModule(affectation, m.numero, section, defautParc);
+      const sec = sectionPar(section);
+      const c = compositionDuModule(affectation, m.numero, sec ? { id: sec.id, nom: sec.nom } : null, defautParc);
       jouees.add(c.nom);
       const lettre = el("span", abr.get(c.nom) ?? c.nom.slice(0, 2), c.origine === "module" ? "lettre propre" : "lettre");
-      const titre = `Module ${m.numero} · ${section || "sans section"} · joue ${c.nom}${c.origine === "module" ? "" : ` (${c.origine === "section" ? "par sa section" : c.origine === "projet" ? "par défaut du projet" : "par défaut du parc"})`}${m.enLigne ? "" : " · hors ligne"}`;
+      const titre = `Module ${m.numero} · ${sec?.nom || "sans section"} · joue ${c.nom}${c.origine === "module" ? "" : ` (${c.origine === "section" ? "par sa section" : c.origine === "projet" ? "par défaut du projet" : "par défaut du parc"})`}${m.enLigne ? "" : " · hors ligne"}`;
       const estChoisi = choisi?.type === "module" && choisi.numero === m.numero;
-      const choisir = () => { choisi = { type: "module", numero: m.numero, section }; rendre(); };
+      const choisir = () => { choisi = { type: "module", numero: m.numero, section: sec ? { id: sec.id, nom: sec.nom } : null }; rendre(); };
       let x = place?.x, y = place?.y;
       if (x == null || y == null) {
-        const zone = impl.sections.find((s) => s.nom === section)?.zone;
+        const zone = sec?.zone;
         if (zone) {
           rangs[section] = (rangs[section] ?? -1) + 1;
           const parLigne = Math.max(1, Math.floor(zone.l / 0.05));
@@ -257,12 +262,12 @@ export function ouvrirOngletPlan(): void {
 
   const panneauChoix = (cible: Cible, affectation: ReturnType<typeof lireAffectationCompositions>) => {
     const boite = el("div", "", "choix");
-    const actuelle = cible.type === "module" ? affectation.modules[String(cible.numero)] ?? "" : affectation.sections[cible.nom] ?? "";
+    const actuelle = cible.type === "module" ? affectation.modules[String(cible.numero)] ?? "" : affectation.sections[cible.id] ?? affectation.sections[cible.nom] ?? "";
     let heritage: string;
     if (cible.type === "module") {
       const sansPropre = compositionDuModule({ ...affectation, modules: {} }, cible.numero, cible.section, defautParc);
       heritage = sansPropre.origine === "section" ? `comme sa section (${sansPropre.nom})` : `par défaut (${sansPropre.nom})`;
-      boite.append(el("div", `Module ${cible.numero}${cible.section ? ` · ${cible.section}` : ""}`, "titre"));
+      boite.append(el("div", `Module ${cible.numero}${cible.section ? ` · ${cible.section.nom}` : ""}`, "titre"));
     } else {
       heritage = `par défaut (${affectation.defaut || defautParc})`;
       boite.append(el("div", `Section ${cible.nom}`, "titre"));
@@ -274,7 +279,7 @@ export function ouvrirOngletPlan(): void {
       b.type = "button";
       b.setAttribute("aria-pressed", String(actuelle === valeur));
       b.onclick = () => {
-        affecterComposition(cible.type === "module" ? { type: "module", numero: cible.numero } : { type: "section", nom: cible.nom }, valeur);
+        affecterComposition(cible.type === "module" ? { type: "module", numero: cible.numero } : { type: "section", id: cible.id, nom: cible.nom }, valeur);
       };
       return b;
     };

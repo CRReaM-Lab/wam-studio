@@ -12,7 +12,8 @@
 export type AffectationCompositions = {
   /** La composition des modules dont ni eux ni leur section n'ont la leur ("" : celle du parc). */
   defaut: string;
-  /** Par nom de section de l'implantation active. */
+  /** Par identifiant de section de l'implantation active (`s1`…) ; un projet d'avant les
+   *  retient par nom de section, encore lu en secours. */
   sections: Record<string, string>;
   /** Par numéro de module. */
   modules: Record<string, string>;
@@ -73,7 +74,7 @@ export function ecrireAffectationCompositions(affectation: AffectationCompositio
 
 /** Donne (ou retire, avec "") la composition d'un module, d'une section ou celle par défaut. */
 export function affecterComposition(
-  cible: { type: "module"; numero: number } | { type: "section"; nom: string } | { type: "defaut" },
+  cible: { type: "module"; numero: number } | { type: "section"; id: string; nom: string } | { type: "defaut" },
   composition: string,
 ): void {
   const a = lireAffectationCompositions();
@@ -81,9 +82,11 @@ export function affecterComposition(
   if (cible.type === "defaut") a.defaut = nom;
   else {
     const table = cible.type === "module" ? a.modules : a.sections;
-    const cle = cible.type === "module" ? String(cible.numero) : cible.nom;
+    const cle = cible.type === "module" ? String(cible.numero) : cible.id;
     if (nom) table[cle] = nom;
     else delete table[cle];
+    // L'ancienne clé par nom (projet d'avant les identifiants) ne doit plus l'emporter.
+    if (cible.type === "section" && cible.nom !== cible.id) delete table[cible.nom];
   }
   ecrireAffectationCompositions(a);
 }
@@ -95,12 +98,14 @@ export function affecterComposition(
 export function compositionDuModule(
   affectation: AffectationCompositions,
   numero: number,
-  section: string,
+  /** La section du module (son identifiant et son nom), ou null : réserve, sans section. */
+  section: { id: string; nom: string } | null,
   defautParc: string,
 ): { nom: string; origine: "module" | "section" | "projet" | "parc" } {
   const propre = affectation.modules[String(numero)];
   if (propre) return { nom: propre, origine: "module" };
-  const deSection = section ? affectation.sections[section] : undefined;
+  // Par identifiant ; un projet d'avant les identifiants la retient par nom.
+  const deSection = section ? affectation.sections[section.id] ?? affectation.sections[section.nom] : undefined;
   if (deSection) return { nom: deSection, origine: "section" };
   if (affectation.defaut) return { nom: affectation.defaut, origine: "projet" };
   return { nom: defautParc, origine: "parc" };
