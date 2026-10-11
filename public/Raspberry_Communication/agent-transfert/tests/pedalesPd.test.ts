@@ -40,3 +40,15 @@ describe("la barre de la fenêtre des effets", () => {
     expect(t.detail).toMatch(/WAMfreeverbMB/);
   });
 });
+
+import { adressesPedale } from "../../Services/PedalesPd";
+
+describe("le descripteur d'une pédale de la bibliothèque, comme le pedalboard", () => {
+  it("à côté de son index.js, ou dans son dossier", () => {
+    const lib = "https://192.168.1.2/bank/crream_library.json";
+    expect(adressesPedale("https://192.168.1.2/bank/plugins/greyhole/index.js", lib).descripteur).toBe("https://192.168.1.2/bank/plugins/greyhole/descriptor.json");
+    expect(adressesPedale("https://mainline.i3s.unice.fr/WAMChorusMB/", lib).descripteur).toBe("https://mainline.i3s.unice.fr/WAMChorusMB/descriptor.json");
+    expect(adressesPedale("plugins/disto_machine/src/index.js", lib).descripteur).toBe("https://192.168.1.2/bank/plugins/disto_machine/src/descriptor.json");
+    expect(dossierDepuisAdresse(adressesPedale("https://192.168.1.2/bank/plugins/greyhole/index.js", lib).classe, "https://192.168.1.2")).toBe("greyhole");
+  });
+});

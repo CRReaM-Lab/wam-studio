@@ -29,6 +29,18 @@ export function dossierDepuisAdresse(adresse: string, origine: string = window.l
   return i >= 0 && segments[i + 1] === "plugins" && segments[i + 2] ? segments[i + 2] : null;
 }
 
+/**
+ * L'adresse de la classe d'une pédale de la bibliothèque, et celle de son descriptor.json, comme
+ * le pedalboard (Pedalboard2Library : `new URL("descriptor.json", classURL)`) :
+ * `…/plugins/greyhole/index.js` → `…/plugins/greyhole/descriptor.json`. Ajouter un `/` à une
+ * adresse de fichier cherchait `…/index.js/descriptor.json` (404) : aucune pédale n'avait
+ * d'équivalent.
+ */
+export function adressesPedale(chemin: string, urlBibliotheque: string): { classe: string; descripteur: string } {
+  const classe = new URL(chemin, urlBibliotheque).href;
+  return { classe, descripteur: new URL("descriptor.json", classe).href };
+}
+
 const tables = new Map<string, Promise<Map<string, string>>>();
 
 /** Identifiant WAM → nom de la pédale Pd, pour une bibliothèque du pedalboard. */
@@ -41,16 +53,14 @@ function table(bibliotheque: string): Promise<Map<string, string>> {
       const descripteur = (await fetch(urlBibliotheque).then((r) => r.json())) as { plugins?: string[] };
       await Promise.all(
         (descripteur.plugins ?? []).map(async (chemin) => {
-          // Comme le pedalboard : l'adresse de la classe, puis descriptor.json à côté.
-          const classe = new URL(chemin, urlBibliotheque).href;
-          const adresseClasse = classe.endsWith("/") ? classe : classe + "/";
+          const { classe, descripteur: adresseDescripteur } = adressesPedale(chemin, urlBibliotheque);
           try {
-            const d = (await fetch(new URL("descriptor.json", adresseClasse).href).then((r) => r.json())) as {
+            const d = (await fetch(adresseDescripteur).then((r) => r.json())) as {
               identifier?: string;
               vendor?: string;
               name?: string;
             };
-            const dossier = dossierDepuisAdresse(adresseClasse);
+            const dossier = dossierDepuisAdresse(classe);
             if (dossier) resultat.set(d.identifier ?? `${d.vendor}.${d.name}`, nomPedalePd(dossier));
           } catch {
             /* pédale sans descripteur : pas de pédale Pd */
