@@ -1,4 +1,5 @@
 import { monterFenetre } from "./PanneauPiSon";
+import { ouvrirEditeurKit } from "./SearchRaspberryFenetreKit";
 import { FAMILLES_GM, nomGeneralMidi } from "../Services/GeneralMidi";
 import {
   envoyerAuxModules,
@@ -384,7 +385,12 @@ export function ouvrirOngletPlan(): void {
         dire(numero, `Échec de l'import : ${erreur instanceof Error ? erreur.message : String(erreur)}`);
       }
     };
-    bloc.append(importer, fichier);
+    // Ou fabriquer un kit de batterie (909 du drumsampler, fichiers, freesound) pour ce module.
+    const kit = el("button", "Nouveau kit…");
+    kit.type = "button";
+    Object.assign(kit.style, { minHeight: "44px", marginTop: "8px", marginLeft: "6px" });
+    kit.onclick = () => ouvrirEditeurKit({ pourModule: numero });
+    bloc.append(importer, fichier, kit);
 
     const message = messagesInstrument.get(numero);
     if (message) bloc.append(el("div", message, "aide"));

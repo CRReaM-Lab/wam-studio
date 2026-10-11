@@ -56,10 +56,19 @@ export async function lireBibliotheque(): Promise<ListeBibliotheque> {
   return { instruments: j.instruments ?? [], surLesPi: j.surLesPi ?? {} };
 }
 
-/** Dépose un fichier (WAV, SF2, SF3) ; rend son empreinte et ce que le serveur y a reconnu. */
-export async function deposerFichier(fichier: File): Promise<{ empreinte: string; genre: string; description: string }> {
+/** L'adresse d'un fichier de la bibliothèque (rangé par empreinte : il ne change jamais). */
+export function urlFichier(empreinte: string): string {
+  return `${PREFIXE}/fichiers/${empreinte}`;
+}
+
+/**
+ * Dépose un fichier (WAV, SF2, SF3) ; rend son empreinte et ce que le serveur y a reconnu.
+ * `origine` : d'où il vient (freesound, un kit en ligne), gardé pour les crédits.
+ */
+export async function deposerFichier(fichier: File, origine?: Record<string, unknown>): Promise<{ empreinte: string; genre: string; description: string }> {
   const formulaire = new FormData();
   formulaire.append("fichier", fichier, fichier.name);
+  if (origine) formulaire.append("origine", JSON.stringify(origine));
   return reponse(await fetch(`${PREFIXE}/fichiers`, { method: "POST", body: formulaire }));
 }
 
@@ -94,4 +103,32 @@ export async function envoyerAuxModules(nom: string, ips: string[]): Promise<Res
   const j = (await r.json().catch(() => ({}))) as { resultats?: ResultatEnvoi[]; error?: string };
   if (!j.resultats) throw new Error(j.error || `${r.status}`);
   return j.resultats;
+}
+
+/** Une case d'un kit : un son de la bibliothèque sur une note (le drumsampler de WAM). */
+export type CaseKit = {
+  nom: string;
+  empreinte: string;
+  note: number;
+  /** 0 à 1,5. */
+  gain: number;
+  /** -1 (gauche) à 1 (droite). */
+  pan: number;
+  /** -1 (aigus coupés) à 1 (graves coupés). */
+  timbre: number;
+  /** 0 : aucun ; une case du même groupe coupe celles qui sonnent (charleston). */
+  groupe: number;
+};
+
+/** Demande au serveur la SoundFont du kit ; rend l'instrument (avec ses avertissements). */
+export async function fabriquerKit(nom: string, cases: CaseKit[], remplacer = false): Promise<InstrumentBibliotheque> {
+  if (!nomValide(nom)) throw new Error(`nom « ${nom} » : lettres, chiffres, _ et - seulement`);
+  const r = await fetch(`${PREFIXE}/kits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nom, cases, remplacer }),
+  });
+  const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; problemes?: string[]; instrument?: InstrumentBibliotheque };
+  if (!r.ok || !j.instrument) throw new Error([j.error, ...(j.problemes ?? [])].filter(Boolean).join(" ; ") || `${r.status}`);
+  return j.instrument;
 }
