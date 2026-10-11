@@ -4,7 +4,7 @@ import OperableAudioBuffer from "../../src/Audio/OperableAudioBuffer";
 import type { ProjectData } from "../../src/Loader/Loader";
 import SampleRegion from "../../src/Models/Region/SampleRegion";
 import { pedalePd } from "../Services/PedalesPd";
-import type { EffetDecrit, IWamPistesPont, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
+import type { EffetDecrit, IWamPistesPont, ReglagesEffet, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
 import { creerBinding } from "../Models/RaspberryTrackBinding";
 import { appliquerIndicateurRaspberry } from "../Services/RaspberryIndicateurPisteUi";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
@@ -127,6 +127,46 @@ export default class WamPistesPontImpl implements IWamPistesPont {
       objetPd: null,
       etat,
     }];
+  }
+
+  public async lireReglagesEffets(trackId: number): Promise<ReglagesEffet[]> {
+    // Le pedalboard expose les paramètres de ses pédales sous `<id de la pédale><|:pdb2:|><paramètre>`,
+    // libellés `<Pédale> n°<k> -> <paramètre>` ; son état donne l'ordre de la chaîne et l'id de chacune.
+    const noeud = this.app.tracksController.getTrackById(trackId)?.plugin?.audioNode as unknown as {
+      getState(): Promise<{ plugins?: { id?: number; wam_id: string }[] }>;
+      getParameterInfo(): Promise<Record<string, { id: string; label: string; type: string; minValue: number; maxValue: number; defaultValue: number; choices?: string[] }>>;
+      getParameterValues(normalise: boolean): Promise<Record<string, { value: number }>>;
+    } | undefined;
+    if (!noeud?.getState) return [];
+    const etat = await noeud.getState();
+    if (!Array.isArray(etat?.plugins)) return [];
+    const [infos, valeurs] = await Promise.all([noeud.getParameterInfo(), noeud.getParameterValues(false)]);
+    return etat.plugins.map((pedale, position) => {
+      const prefixe = `${pedale.id}<|:pdb2:|>`;
+      const siens = Object.values(infos).filter((i) => pedale.id !== undefined && i.id.startsWith(prefixe));
+      return {
+        position,
+        nom: siens[0]?.label.split(" n°")[0] ?? String(pedale.wam_id),
+        parametres: siens.map((i) => ({
+          id: i.id,
+          nom: i.label.split(" -> ").pop() ?? i.label,
+          min: i.minValue,
+          max: i.maxValue,
+          valeur: valeurs[i.id]?.value ?? i.defaultValue,
+          discret: i.type === "int" || i.type === "boolean" || i.type === "choice",
+          choix: i.type === "choice" ? i.choices ?? [] : [],
+        })),
+      };
+    });
+  }
+
+  public async reglerEffet(trackId: number, id: string, valeur: number): Promise<void> {
+    const noeud = this.app.tracksController.getTrackById(trackId)?.plugin?.audioNode as unknown as {
+      setParameterValues(v: Record<string, { id: string; value: number; normalized: boolean }>): Promise<void>;
+    } | undefined;
+    // Le pedalboard passe la valeur telle quelle à la pédale : elle porte l'id de la pédale, pas l'exposé.
+    const interne = id.split("<|:pdb2:|>")[1] ?? id;
+    await noeud?.setParameterValues({ [id]: { id: interne, value: valeur, normalized: false } });
   }
 
   public abonnerClicDroitRegion(

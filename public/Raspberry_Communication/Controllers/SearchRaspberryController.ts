@@ -111,6 +111,7 @@ import { invaliderCacheFichiersSonPi } from "../Views/panneaux/SearchRaspberryPa
 import { installerPanneauPiSon } from "../Views/PanneauPiSon";
 import { ouvrirOngletOsc } from "../Views/SearchRaspberryFenetreOsc";
 import { ouvrirOngletPlan } from "../Views/SearchRaspberryFenetrePlan";
+import { demarrerInspecteur } from "../Views/RaspberryInspecteur";
 import { demanderRemplacement } from "../Views/DemandeRemplacement";
 import { extraireNumeroSonOscDepuisFichier, OSC_PLAY_NIVEAU_DEFAUT } from "../utils/osc/OscPlayHelpers";
 import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
@@ -325,6 +326,8 @@ export default class SearchRaspberryController {
             });
             // Le suivi des effets d'une piste sur son module : réglé dans la fenêtre des effets.
             demarrerBarreEffets(pont);
+            // L'inspecteur de la piste choisie, dans la zone du bas.
+            demarrerInspecteur(pont);
             // Le fader de chaque piste liée : le niveau de son module (/level).
             // Et le master de WAM : tous les modules (/volume, /mute).
             pont.abonnerGestesMaster(

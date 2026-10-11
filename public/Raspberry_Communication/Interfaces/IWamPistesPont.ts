@@ -19,6 +19,24 @@ export type EffetDecrit = {
   etat: unknown;
 };
 
+/** Un paramètre réglable d'une pédale du pedalboard d'une piste. */
+export type ParametreEffet = {
+  /** L'identifiant exposé par le pedalboard (`<pédale><|:pdb2:|><paramètre>`). */
+  id: string;
+  /** Son libellé dans la pédale (« Wet »). */
+  nom: string;
+  min: number;
+  max: number;
+  valeur: number;
+  /** Un entier, un interrupteur ou un choix : réglé par pas de 1. */
+  discret: boolean;
+  /** Les libellés d'un paramètre à choix, dans l'ordre des valeurs. */
+  choix: string[];
+};
+
+/** Les réglages d'une pédale, à sa place dans la chaîne. */
+export type ReglagesEffet = { position: number; nom: string; parametres: ParametreEffet[] };
+
 import type { RaspberryTrackBinding } from "../Models/RaspberryTrackBinding";
 import type { EntreeRegionSonPersiste } from "../Services/RaspberryRegionSonStore";
 
@@ -62,6 +80,12 @@ export interface IWamPistesPont {
 
   /** Les effets (FX) d'une piste, identifiés exactement, avec l'état de leurs paramètres. */
   decrireEffetsPiste(trackId: number): Promise<EffetDecrit[]>;
+
+  /** Les réglages de chaque pédale du pedalboard de la piste, dans l'ordre de la chaîne ; [] sans pedalboard. */
+  lireReglagesEffets(trackId: number): Promise<ReglagesEffet[]>;
+
+  /** Règle un paramètre d'une pédale de la piste (identifiant de `lireReglagesEffets`). */
+  reglerEffet(trackId: number, id: string, valeur: number): Promise<void>;
 
   /** Clic droit sur une région de l'arrangeur (coordonnées de la fenêtre). Rend le désabonnement. */
   abonnerClicDroitRegion(

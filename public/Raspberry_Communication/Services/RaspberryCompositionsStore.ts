@@ -24,7 +24,12 @@ export type AffectationCompositions = {
   synthes: Record<string, string>;
   /** Le master de WAM, appliqué à tous les modules (`/volume`, `/mute`) ; absent : jamais touché. */
   general?: { niveau?: number; muet?: boolean };
+  /** Le limiteur de sortie de chaque module, par numéro (`/limiteur plafond|relache`) ; absent : ses valeurs par défaut. */
+  limiteurs?: Record<string, ReglageLimiteur>;
 };
+
+/** Le limiteur de sortie d'un module (`plafond~`) : plafond en dB (−20…0), relâchement en s (0,01…2). */
+export type ReglageLimiteur = { plafond?: number; relache?: number };
 
 export type InstrumentSoundfont = {
   programme: number;
@@ -74,6 +79,31 @@ function instruments(valeur: unknown): Record<string, InstrumentSoundfont> {
   return resultat;
 }
 
+function limiteurs(valeur: unknown): Pick<AffectationCompositions, "limiteurs"> {
+  if (!valeur || typeof valeur !== "object") return {};
+  const resultat: Record<string, ReglageLimiteur> = {};
+  const borne = (v: unknown, min: number, max: number) => {
+    const n = Number(v);
+    return v !== undefined && v !== null && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined;
+  };
+  for (const [cle, l] of Object.entries(valeur as Record<string, unknown>)) {
+    if (!/^\d+$/.test(cle) || !l || typeof l !== "object") continue;
+    const r = l as { plafond?: unknown; relache?: unknown };
+    const plafond = borne(r.plafond, -20, 0);
+    const relache = borne(r.relache, 0.01, 2);
+    if (plafond !== undefined || relache !== undefined)
+      resultat[cle] = { ...(plafond !== undefined ? { plafond } : {}), ...(relache !== undefined ? { relache } : {}) };
+  }
+  return Object.keys(resultat).length ? { limiteurs: resultat } : {};
+}
+
+/** Règle le limiteur d'un module (retenu avec le projet). */
+export function affecterLimiteur(numero: number, changement: ReglageLimiteur): void {
+  const a = lireAffectationCompositions();
+  a.limiteurs = { ...a.limiteurs, [String(numero)]: { ...a.limiteurs?.[String(numero)], ...changement } };
+  ecrireAffectationCompositions(a);
+}
+
 function general(valeur: unknown): Pick<AffectationCompositions, "general"> {
   if (!valeur || typeof valeur !== "object") return {};
   const g = valeur as { niveau?: unknown; muet?: unknown };
@@ -104,6 +134,7 @@ export function lireAffectationBrute(valeur: unknown): AffectationCompositions {
     instruments: instruments(item.instruments),
     synthes: noms(item.synthes),
     ...general(item.general),
+    ...limiteurs(item.limiteurs),
   };
 }
 
