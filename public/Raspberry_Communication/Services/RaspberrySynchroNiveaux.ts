@@ -7,8 +7,12 @@
  * Seuls les gestes comptent (RaspberryIndicateurPisteUi les retient dans la liaison) : pendant la
  * lecture, les marqueurs (`/play`, `/attenuation`) bougent aussi le fader pour l'écoute dans WAM,
  * et ne doivent pas devenir le niveau de tout le module. Le niveau retenu repart à chaque
- * changement, à chaque lecture (RaspberryLectureServeur), et toutes les 10 s : un module
- * redémarré, ou une composition rechargée (qui repart à 100), se rattrape seul.
+ * changement, au départ de chaque lecture (RaspberryLectureServeur), et toutes les 10 s hors
+ * lecture : un module redémarré, ou une composition rechargée (qui repart à 100), se rattrape seul.
+ *
+ * Le marqueur gagne : pendant la lecture, rien n'est renvoyé de soi-même, un `/level` ou un
+ * `/volume` posé sur la timeline tient jusqu'au marqueur suivant. Seul un geste sur le fader part.
+ * À l'arrêt, le niveau du fader revient.
  */
 import type { RaspberryTrackBinding } from "../Models/RaspberryTrackBinding";
 
@@ -48,6 +52,8 @@ export function demarrerSynchroNiveaux(params: {
   modulesEnLigne: () => string[];
   /** Envoie `<adresse> <valeur>` au module ; faux : serveur non connecté. */
   envoyer: (ip: string, adresse: string, valeur: string) => boolean;
+  /** Vrai pendant la lecture : les marqueurs ont la main, pas de renvoi de soi-même. */
+  enLecture: () => boolean;
 }): void {
   /** Par module et par adresse : la valeur envoyée et quand. */
   const envoye = new Map<string, { valeur: string; quand: number }>();
@@ -61,9 +67,10 @@ export function demarrerSynchroNiveaux(params: {
     for (const ip of enLigne) {
       for (const m of messagesGeneral(params.general())) voulus.set(`${ip} ${m.adresse}`, m.valeur);
     }
+    const enLecture = params.enLecture();
     for (const [cle, valeur] of voulus) {
       const avant = envoye.get(cle);
-      if (avant && avant.valeur === valeur && maintenant - avant.quand < ETAT_COMPLET_MS) continue;
+      if (avant && avant.valeur === valeur && (enLecture || maintenant - avant.quand < ETAT_COMPLET_MS)) continue;
       const [ip, adresse] = cle.split(" ");
       if (params.envoyer(ip, adresse, valeur)) envoye.set(cle, { valeur, quand: maintenant });
     }

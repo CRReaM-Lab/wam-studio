@@ -47,3 +47,33 @@ describe("master de WAM vers tous les modules", () => {
     expect(lireAffectationBrute({}).general).toBeUndefined();
   });
 });
+
+describe("le marqueur gagne pendant la lecture", () => {
+  it("hors lecture : renvoi toutes les 10 s ; en lecture : seulement un geste", async () => {
+    const { vi } = await import("vitest");
+    const { demarrerSynchroNiveaux } = await import("../../Services/RaspberrySynchroNiveaux");
+    vi.useFakeTimers();
+    (globalThis as unknown as { window: typeof globalThis }).window = globalThis;
+    const b = { ...creerBinding(1, "192.168.1.33", 33, 1), niveau: 90 };
+    let lecture = false;
+    const envois: string[] = [];
+    demarrerSynchroNiveaux({
+      liaisons: () => [b],
+      general: () => undefined,
+      modulesEnLigne: () => ["192.168.1.33"],
+      envoyer: (ip, adresse, valeur) => (envois.push(`${adresse} ${valeur}`), true),
+      enLecture: () => lecture,
+    });
+    vi.advanceTimersByTime(150);
+    expect(envois).toEqual(["/level 90"]);
+    vi.advanceTimersByTime(10_100);
+    expect(envois).toEqual(["/level 90", "/level 90"]);
+    lecture = true;
+    vi.advanceTimersByTime(20_000);
+    expect(envois.length).toBe(2);
+    b.niveau = 80;
+    vi.advanceTimersByTime(150);
+    expect(envois.at(-1)).toBe("/level 80");
+    vi.useRealTimers();
+  });
+});

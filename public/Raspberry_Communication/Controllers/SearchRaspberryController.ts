@@ -334,6 +334,7 @@ export default class SearchRaspberryController {
                 [...this.state.raspberryMap.values()].filter((r) => r.isOnline === true).map((r) => r.ip),
               envoyer: (ip, adresse, valeur) =>
                 this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: adresse, OSCValue: valeur }),
+              enLecture: () => pont.lectureEstActive(),
             });
             // Une seule lecture : Play dans WAM joue aussi sur les Pi, par le serveur.
             demarrerLectureServeur({
