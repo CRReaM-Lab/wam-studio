@@ -17,7 +17,11 @@ export type AffectationCompositions = {
   sections: Record<string, string>;
   /** Par numéro de module. */
   modules: Record<string, string>;
+  /** L'instrument d'un module qui joue `soundfont`, par numéro de module (General MIDI). */
+  instruments: Record<string, InstrumentSoundfont>;
 };
+
+export type InstrumentSoundfont = { programme: number; banque: number };
 
 const CLE_STOCKAGE = "wam-compositions-projet";
 export const EVENEMENT_COMPOSITIONS = "wam-compositions-projet";
@@ -40,7 +44,20 @@ function noms(valeur: unknown): Record<string, string> {
 }
 
 export function affectationVide(): AffectationCompositions {
-  return { defaut: "", sections: {}, modules: {} };
+  return { defaut: "", sections: {}, modules: {}, instruments: {} };
+}
+
+function instruments(valeur: unknown): Record<string, InstrumentSoundfont> {
+  const resultat: Record<string, InstrumentSoundfont> = {};
+  if (!valeur || typeof valeur !== "object") return resultat;
+  for (const [cle, v] of Object.entries(valeur as Record<string, unknown>)) {
+    const i = v as Partial<InstrumentSoundfont> | null;
+    const programme = Number(i?.programme), banque = Number(i?.banque ?? 0);
+    if (Number.isInteger(programme) && programme >= 0 && programme <= 127 && Number.isInteger(banque) && banque >= 0) {
+      resultat[cle] = { programme, banque };
+    }
+  }
+  return resultat;
 }
 
 /** Une affectation lue d'un projet ou du navigateur ; tout ce qui n'en a pas la forme est ignoré. */
@@ -51,6 +68,7 @@ export function lireAffectationBrute(valeur: unknown): AffectationCompositions {
     defaut: typeof item.defaut === "string" ? item.defaut.trim() : "",
     sections: noms(item.sections),
     modules: noms(item.modules),
+    instruments: instruments(item.instruments),
   };
 }
 
@@ -88,6 +106,14 @@ export function affecterComposition(
     // L'ancienne clé par nom (projet d'avant les identifiants) ne doit plus l'emporter.
     if (cible.type === "section" && cible.nom !== cible.id) delete table[cible.nom];
   }
+  ecrireAffectationCompositions(a);
+}
+
+/** Donne (ou retire, avec null) l'instrument soundfont d'un module. */
+export function affecterInstrument(numero: number, instrument: InstrumentSoundfont | null): void {
+  const a = lireAffectationCompositions();
+  if (instrument) a.instruments[String(numero)] = instrument;
+  else delete a.instruments[String(numero)];
   ecrireAffectationCompositions(a);
 }
 

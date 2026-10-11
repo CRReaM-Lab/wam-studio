@@ -1,6 +1,8 @@
 import { monterFenetre } from "./PanneauPiSon";
+import { FAMILLES_GM, nomGeneralMidi } from "../Services/GeneralMidi";
 import {
   affecterComposition,
+  affecterInstrument,
   compositionDuModule,
   EVENEMENT_COMPOSITIONS,
   lireAffectationCompositions,
@@ -228,6 +230,42 @@ export function ouvrirOngletPlan(): void {
     );
   };
 
+  /**
+   * L'instrument General MIDI d'un module qui joue `soundfont` : gardé avec le projet, envoyé tout
+   * de suite au module (/pgm), et de nouveau à chaque lecture.
+   */
+  const reglageInstrument = (numero: number, affectation: ReturnType<typeof lireAffectationCompositions>) => {
+    const bloc = el("div");
+    bloc.style.marginTop = "10px";
+    const m = modules.find((x) => x.numero === numero);
+    const choisi = affectation.instruments[String(numero)];
+    bloc.append(el("div", `Instrument (General MIDI, GeneralUser_GS) : ${choisi ? `${nomGeneralMidi(choisi.programme)} (${choisi.programme})` : "Piano acoustique (0, par défaut)"}`, "aide"));
+    const select = el("select");
+    Object.assign(select.style, { minHeight: "44px", font: "inherit", fontSize: "14px", maxWidth: "100%" });
+    FAMILLES_GM.forEach((f, i) => {
+      const groupe = document.createElement("optgroup");
+      groupe.label = f.famille;
+      f.instruments.forEach((nom, j) => groupe.append(new Option(`${i * 8 + j} · ${nom}`, String(i * 8 + j))));
+      select.append(groupe);
+    });
+    select.value = String(choisi?.programme ?? 0);
+    const etat = el("div", "", "aide");
+    select.onchange = async () => {
+      const programme = Number(select.value);
+      affecterInstrument(numero, { programme, banque: 0 });
+      if (!m?.enLigne) return;
+      try {
+        const r = await fetch("/api/maintenance/osc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip: m.ip, adresse: "/pgm", valeur: String(programme) }) });
+        const j = (await r.json()) as { ok: boolean; error?: string };
+        etat.textContent = j.ok ? `Envoyé au module ${numero}.` : `Échec : ${j.error}`;
+      } catch (erreur) {
+        etat.textContent = `Échec : ${erreur instanceof Error ? erreur.message : String(erreur)}`;
+      }
+    };
+    bloc.append(select, etat);
+    return bloc;
+  };
+
   /** Le tampon de Pd d'un module : changé sans relancer Pd (court silence), retenu par le module. */
   const reglageTampon = (numero: number) => {
     const bloc = el("div");
@@ -290,7 +328,12 @@ export function ouvrirOngletPlan(): void {
     fermer.onclick = () => { choisi = null; rendre(); };
     liste.append(fermer);
     boite.append(liste);
-    if (cible.type === "module") boite.append(reglageTampon(cible.numero));
+    if (cible.type === "module") {
+      // L'instrument, pour un module qui joue le contexte soundfont.
+      const joue = compositionDuModule(affectation, cible.numero, cible.section, defautParc).nom;
+      if (joue === "soundfont") boite.append(reglageInstrument(cible.numero, affectation));
+      boite.append(reglageTampon(cible.numero));
+    }
     return boite;
   };
 

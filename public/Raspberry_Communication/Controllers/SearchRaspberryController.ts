@@ -328,6 +328,8 @@ export default class SearchRaspberryController {
               },
               regions: () =>
                 this.sequenceurOsc?.copierDepuisPistes(Array.from(this.state.raspberryMap.values())) ?? [],
+              ipDuModule: (numero) =>
+                Array.from(this.state.raspberryMap.values()).find((r) => extraireNumeroRaspberryDepuisIp(r.ip) === numero)?.ip,
             });
             demarrerReveilAudioContexte(pont);
             this.persistancePistes?.demarrerAutosave();

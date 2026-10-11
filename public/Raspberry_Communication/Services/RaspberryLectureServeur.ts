@@ -14,6 +14,21 @@ import { lireMarqueursSequenceur } from "./RaspberryMarqueursStore";
 import type { EvenementSequenceurOsc } from "./RaspberrySequenceurOscService";
 import { lireAffectationCompositions } from "./RaspberryCompositionsStore";
 
+/**
+ * Les instruments soundfont du projet, au départ de la lecture : /bank puis /pgm à chaque module
+ * qui en a un (le serveur les envoie après /composition et son délai de chargement).
+ */
+export function evenementsInstruments(departMs: number, ipDuModule: (numero: number) => string | undefined): EvenementProgramme[] {
+  const evenements: EvenementProgramme[] = [];
+  for (const [numero, i] of Object.entries(lireAffectationCompositions().instruments)) {
+    const ip = ipDuModule(Number(numero));
+    if (!ip) continue;
+    if (i.banque !== 0) evenements.push({ tMs: departMs, ip, adresse: "/bank", valeur: String(i.banque) });
+    evenements.push({ tMs: departMs, ip, adresse: "/pgm", valeur: String(i.programme) });
+  }
+  return evenements;
+}
+
 
 const INTERVALLE_SURVEILLANCE_MS = 30;
 
@@ -61,6 +76,8 @@ export function demarrerLectureServeur(params: {
   envoyer: (message: Record<string, unknown> & { type: string }) => boolean;
   /** Les régions des pistes « rasp N », avec les IP et niveaux du moment. */
   regions: () => EvenementSequenceurOsc[];
+  /** L'adresse d'un module par son numéro (pour ses réglages d'instrument). */
+  ipDuModule: (numero: number) => string | undefined;
 }): void {
   let enLecture = params.pont.lectureEstActive();
   /* La position de la tête À L'ARRÊT : c'est d'elle que part Play. Lue au moment où l'on
@@ -79,7 +96,10 @@ export function demarrerLectureServeur(params: {
         depuisMs: Math.round(positionArret),
         // Le serveur la traduit en /composition N pour chaque Pi (Programme.fs).
         affectation: lireAffectationCompositions(),
-        evenements: construireProgrammeServeur(params.regions()),
+        evenements: [
+          ...evenementsInstruments(Math.round(positionArret), params.ipDuModule),
+          ...construireProgrammeServeur(params.regions()),
+        ],
       });
     } else {
       params.envoyer({ type: "programmeArreter", couper: lireCueEnAttente() === null });
