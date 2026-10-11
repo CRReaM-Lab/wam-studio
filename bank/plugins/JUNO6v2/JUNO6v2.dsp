@@ -59,7 +59,8 @@ vcf = fi.resonlp(fc_env, q, 1) with {
     fc_base = freq * ui_vcf_freq * 50 * ui_vcf_kybd + 50 * (ui_vcf_freq * 100 + 1) * (1 - ui_vcf_kybd) : *(1 + lfo1 * ui_vcf_lfo);
     fc_env_up = fc_base + env * ui_vcf_env * (20000 - fc_base);
     fc_env_down = fc_base - env * ui_vcf_env * fc_base;
-    fc_env = fc_env_up * (ui_vcf_polar == 0) + fc_env_down * (ui_vcf_polar == 1) : si.smoo : max(1);
+    // Borné sous Nyquist : au-delà, fi.resonlp diverge (NaN dès ~880 Hz avec FREQ 0.6 à 48 kHz).
+    fc_env = fc_env_up * (ui_vcf_polar == 0) + fc_env_down * (ui_vcf_polar == 1) : si.smoo : max(1) : min(ma.SR * 0.45);
     q = 1 + ui_vcf_res * 30;
 };
 
