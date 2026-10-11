@@ -112,6 +112,8 @@ import { installerPanneauPiSon } from "../Views/PanneauPiSon";
 import { ouvrirOngletOsc } from "../Views/SearchRaspberryFenetreOsc";
 import { ouvrirOngletPlan } from "../Views/SearchRaspberryFenetrePlan";
 import { demarrerInspecteur } from "../Views/RaspberryInspecteur";
+import { fermerInterfaceInstrument } from "../Views/RaspberryInterfaceInstrument";
+import { demarrerApplicationProjet } from "../Services/RaspberryApplicationProjet";
 import { demanderRemplacement } from "../Views/DemandeRemplacement";
 import { extraireNumeroSonOscDepuisFichier, OSC_PLAY_NIVEAU_DEFAUT } from "../utils/osc/OscPlayHelpers";
 import { rafraichirLibellesRegionUi } from "../Services/RaspberryLibellesRegionUi";
@@ -328,6 +330,18 @@ export default class SearchRaspberryController {
             demarrerBarreEffets(pont);
             // L'inspecteur de la piste choisie, dans la zone du bas.
             demarrerInspecteur(pont);
+            // Un autre projet chargé : ses réglages des modules partent tout de suite.
+            demarrerApplicationProjet({
+              lireIdProjet: () => pont.lireProjet().id,
+              modulesEnLigne: () =>
+                [...this.state.raspberryMap.values()]
+                  .filter((r) => r.isOnline === true)
+                  .map((r) => ({ numero: Number(r.ip.split(".").pop()), ip: r.ip }))
+                  .filter((m) => Number.isInteger(m.numero)),
+              envoyer: (ip, adresse, valeur) =>
+                this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: adresse, OSCValue: valeur }),
+              surChangement: fermerInterfaceInstrument,
+            });
             // Le fader de chaque piste liée : le niveau de son module (/level).
             // Et le master de WAM : tous les modules (/volume, /mute).
             pont.abonnerGestesMaster(
