@@ -1,6 +1,6 @@
 /**
- * Les réglages des effets d'une piste suivis en direct sur son module (bouton « FX » de la piste,
- * `fxDirect` de la liaison) : la chaîne de la piste est relue 4 fois par seconde (le pedalboard
+ * Les réglages des effets d'une piste suivis en direct sur son module (« Jouer ces effets sur
+ * rasp N » dans la fenêtre des effets, `fxDirect` de la liaison) : la chaîne de la piste est relue 4 fois par seconde (le pedalboard
  * ne signale pas ses changements) et ce qui a changé part en `/fx`.
  *
  * Une pédale qui change dans un emplacement : tout l'emplacement repart (ses réglages suivent la

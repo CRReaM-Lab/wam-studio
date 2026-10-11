@@ -41,6 +41,9 @@ export interface IWamPistesPont {
 
   focusPiste(trackId: number): void;
 
+  /** La piste choisie (celle dont la fenêtre des effets montre la chaîne), ou null. */
+  lirePisteChoisie(): number | null;
+
   lireNomPiste(trackId: number): string | undefined;
   /** L'identité du projet ouvert (et son nom une fois sauvé), écrite dans la fiche des sons. */
   lireProjet(): { id: string; nom?: string };

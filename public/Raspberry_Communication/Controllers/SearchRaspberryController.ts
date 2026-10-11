@@ -26,9 +26,9 @@ import {
 } from "../utils/agent-transfert/AgentTransfertLogger";
 import {
   brancherLectureRaspberryEnLigne,
-  noterEffetsSansEquivalent,
   rafraichirDisponibiliteCasesLiaison,
 } from "../Services/RaspberryIndicateurPisteUi";
+import { demarrerBarreEffets, noterEffetsSansEquivalent } from "../Services/RaspberryEffetsFenetreUi";
 import {
   HotePanneauListe,
   rafraichirDetailsSiSelection,
@@ -323,6 +323,8 @@ export default class SearchRaspberryController {
                 this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: valeur }),
               signaler: noterEffetsSansEquivalent,
             });
+            // Le suivi des effets d'une piste sur son module : réglé dans la fenêtre des effets.
+            demarrerBarreEffets(pont);
             // Le fader de chaque piste liée : le niveau de son module (/level).
             // Et le master de WAM : tous les modules (/volume, /mute).
             pont.abonnerGestesMaster(

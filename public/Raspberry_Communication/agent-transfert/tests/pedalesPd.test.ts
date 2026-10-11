@@ -16,3 +16,27 @@ describe("la pédale Pd d'une pédale du pedalboard", () => {
     expect(dossierDepuisAdresse(`${serveur}/autre/plugins/x/index.js`, serveur)).toBeNull();
   });
 });
+
+import { pedaleRetenue } from "../../Services/PedalesPd";
+import { texteBarre } from "../../Services/RaspberryEffetsFenetreUi";
+
+describe("seules les pédales installées sur les modules ont un équivalent", () => {
+  it("dans la liste du serveur, ou sans liste (serveur ancien)", () => {
+    const installees = new Set(["greyhole", "owlshimmer"]);
+    expect(pedaleRetenue("greyhole", installees)).toBe("greyhole");
+    expect(pedaleRetenue("kbverb", installees)).toBeNull();
+    expect(pedaleRetenue("kbverb", null)).toBe("kbverb");
+    expect(pedaleRetenue(undefined, installees)).toBeNull();
+  });
+});
+
+describe("la barre de la fenêtre des effets", () => {
+  it("cachée pour une piste non liée ; coupée, suivie, ou avec des pédales sans équivalent", () => {
+    expect(texteBarre({ liee: false, actif: false, sansEquivalent: [] }).visible).toBe(false);
+    expect(texteBarre({ liee: true, raspberryId: 33, actif: false, sansEquivalent: [] })).toMatchObject({ visible: true, libelle: "Jouer ces effets sur rasp 33", alerte: false });
+    expect(texteBarre({ liee: true, raspberryId: 33, actif: true, sansEquivalent: [] }).detail).toMatch(/Suivi en direct/);
+    const t = texteBarre({ liee: true, raspberryId: 33, actif: true, sansEquivalent: ["WAMfreeverbMB"] });
+    expect(t.alerte).toBe(true);
+    expect(t.detail).toMatch(/WAMfreeverbMB/);
+  });
+});

@@ -94,6 +94,11 @@ export default class WamPistesPontImpl implements IWamPistesPont {
     return this.app.exportController.exportRegionAvecEffetsToWaveBlob(track, region.start, region.duration);
   }
 
+  public lirePisteChoisie(): number | null {
+    const piste = this.app.tracksController.selected as { id?: unknown } | null | undefined;
+    return piste && typeof piste.id === "number" ? piste.id : null;
+  }
+
   public async decrireEffetsPiste(trackId: number): Promise<EffetDecrit[]> {
     const plugin = this.app.tracksController.getTrackById(trackId)?.plugin;
     if (!plugin) return [];

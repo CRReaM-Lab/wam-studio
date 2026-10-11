@@ -65,11 +65,39 @@ function table(bibliotheque: string): Promise<Map<string, string>> {
   return t;
 }
 
-/** Le nom de la pédale Pd d'une pédale du pedalboard ; null si elle n'est pas dans la banque. */
+/**
+ * Les pédales installées sur les modules (`pedalesFaust` de `/api/compositions`, posé par
+ * `michel module install`) ; null : le serveur ne le dit pas, on ne filtre pas. Relu toutes les
+ * minutes (une installation pendant la séance).
+ */
+let installees: { quand: number; liste: Promise<Set<string> | null> } | null = null;
+function pedalesInstallees(): Promise<Set<string> | null> {
+  if (!installees || Date.now() - installees.quand > 60000) {
+    installees = {
+      quand: Date.now(),
+      liste: fetch("/api/compositions")
+        .then((r) => r.json())
+        .then((j: { pedalesFaust?: string[] | null }) => (Array.isArray(j.pedalesFaust) ? new Set(j.pedalesFaust) : null))
+        .catch(() => null),
+    };
+  }
+  return installees.liste;
+}
+
+/** La pédale Pd retenue : dans la banque, et installée sur les modules si on le sait. */
+export function pedaleRetenue(nom: string | undefined, installees: Set<string> | null): string | null {
+  if (!nom) return null;
+  return installees && !installees.has(nom) ? null : nom;
+}
+
+/**
+ * Le nom de la pédale Pd d'une pédale du pedalboard ; null si elle n'est pas dans la banque, ou
+ * si les modules ne l'ont pas (non compilée : kbverb).
+ */
 export async function pedalePd(bibliotheque: string | undefined, wamId: string): Promise<string | null> {
   if (!bibliotheque) return null;
   try {
-    return (await table(bibliotheque)).get(wamId) ?? null;
+    return pedaleRetenue((await table(bibliotheque)).get(wamId), await pedalesInstallees());
   } catch {
     return null;
   }
