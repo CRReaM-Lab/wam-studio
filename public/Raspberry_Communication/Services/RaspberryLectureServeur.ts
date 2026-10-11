@@ -41,6 +41,11 @@ export function evenementsInstruments(departMs: number, ipDuModule: (numero: num
     if (i.banque !== 0) evenements.push({ tMs: departMs, ip, adresse: "/bank", valeur: String(i.banque) });
     evenements.push({ tMs: departMs, ip, adresse: "/pgm", valeur: String(i.programme) });
   }
+  // Le synthé des modules qui jouent faust (sans effet sur une autre composition).
+  for (const [numero, synthe] of Object.entries(lireAffectationCompositions().synthes)) {
+    const ip = ipDuModule(Number(numero));
+    if (ip) evenements.push({ tMs: departMs, ip, adresse: "/instrument", valeur: synthe });
+  }
   return evenements;
 }
 

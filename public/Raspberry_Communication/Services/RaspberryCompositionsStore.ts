@@ -19,6 +19,8 @@ export type AffectationCompositions = {
   modules: Record<string, string>;
   /** L'instrument d'un module qui joue `soundfont`, par numéro de module (General MIDI). */
   instruments: Record<string, InstrumentSoundfont>;
+  /** Le synthé d'un module qui joue `faust`, par numéro de module (`juno6v2`) ; absent : sa fiche. */
+  synthes: Record<string, string>;
 };
 
 export type InstrumentSoundfont = { programme: number; banque: number };
@@ -44,7 +46,7 @@ function noms(valeur: unknown): Record<string, string> {
 }
 
 export function affectationVide(): AffectationCompositions {
-  return { defaut: "", sections: {}, modules: {}, instruments: {} };
+  return { defaut: "", sections: {}, modules: {}, instruments: {}, synthes: {} };
 }
 
 function instruments(valeur: unknown): Record<string, InstrumentSoundfont> {
@@ -69,6 +71,7 @@ export function lireAffectationBrute(valeur: unknown): AffectationCompositions {
     sections: noms(item.sections),
     modules: noms(item.modules),
     instruments: instruments(item.instruments),
+    synthes: noms(item.synthes),
   };
 }
 
@@ -114,6 +117,14 @@ export function affecterInstrument(numero: number, instrument: InstrumentSoundfo
   const a = lireAffectationCompositions();
   if (instrument) a.instruments[String(numero)] = instrument;
   else delete a.instruments[String(numero)];
+  ecrireAffectationCompositions(a);
+}
+
+/** Donne (ou retire, avec "") le synthé Faust d'un module. */
+export function affecterSynthe(numero: number, synthe: string): void {
+  const a = lireAffectationCompositions();
+  if (synthe.trim()) a.synthes[String(numero)] = synthe.trim();
+  else delete a.synthes[String(numero)];
   ecrireAffectationCompositions(a);
 }
 

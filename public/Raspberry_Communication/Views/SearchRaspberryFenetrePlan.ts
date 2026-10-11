@@ -3,6 +3,7 @@ import { FAMILLES_GM, nomGeneralMidi } from "../Services/GeneralMidi";
 import {
   affecterComposition,
   affecterInstrument,
+  affecterSynthe,
   compositionDuModule,
   EVENEMENT_COMPOSITIONS,
   lireAffectationCompositions,
@@ -119,6 +120,7 @@ export function ouvrirOngletPlan(): void {
   let impl: Implantation = { sections: [], modules: {} };
   let modules: ModuleParc[] = [];
   let compositions: string[] = [];
+  let instrumentsFaust: string[] = [];
   let defautParc = "skini";
   let choisi: Cible | null = null;
   /** La réserve (modules hors de la salle) : repliée, elle tient sur une ligne. */
@@ -266,6 +268,43 @@ export function ouvrirOngletPlan(): void {
     return bloc;
   };
 
+  /**
+   * Le synthé Faust d'un module qui joue `faust` : parmi les instruments posés sur les modules
+   * (`michel module install`), gardé avec le projet, envoyé tout de suite (/instrument) et à
+   * chaque lecture. Sans choix, le module prend celui de sa fiche.
+   */
+  const reglageSynthe = (numero: number, affectation: ReturnType<typeof lireAffectationCompositions>) => {
+    const bloc = el("div");
+    bloc.style.marginTop = "10px";
+    const m = modules.find((x) => x.numero === numero);
+    const choisi = affectation.synthes[String(numero)] ?? "";
+    bloc.append(el("div", instrumentsFaust.length
+      ? `Instrument Faust : ${choisi || "celui de la fiche du module"}`
+      : "Instrument Faust : aucun sur les modules (michel module install les compile depuis la banque)", "aide"));
+    const select = el("select");
+    Object.assign(select.style, { minHeight: "44px", font: "inherit", fontSize: "14px", maxWidth: "100%" });
+    select.append(new Option("Celui de la fiche du module", ""));
+    for (const nom of instrumentsFaust) select.append(new Option(nom, nom));
+    // Un choix d'un autre projet, que les modules n'ont plus : montré, pour pouvoir le changer.
+    if (choisi && !instrumentsFaust.includes(choisi)) select.append(new Option(`${choisi} (absent des modules)`, choisi));
+    select.value = choisi;
+    select.disabled = instrumentsFaust.length === 0 && !choisi;
+    const etat = el("div", "", "aide");
+    select.onchange = async () => {
+      affecterSynthe(numero, select.value);
+      if (!m?.enLigne || !select.value) return;
+      try {
+        const r = await fetch("/api/maintenance/osc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip: m.ip, adresse: "/instrument", valeur: select.value }) });
+        const j = (await r.json()) as { ok: boolean; error?: string };
+        etat.textContent = j.ok ? `Envoyé au module ${numero}.` : `Échec : ${j.error}`;
+      } catch (erreur) {
+        etat.textContent = `Échec : ${erreur instanceof Error ? erreur.message : String(erreur)}`;
+      }
+    };
+    bloc.append(select, etat);
+    return bloc;
+  };
+
   /** Le tampon de Pd d'un module : changé sans relancer Pd (court silence), retenu par le module. */
   const reglageTampon = (numero: number) => {
     const bloc = el("div");
@@ -332,6 +371,7 @@ export function ouvrirOngletPlan(): void {
       // L'instrument, pour un module qui joue le contexte soundfont.
       const joue = compositionDuModule(affectation, cible.numero, cible.section, defautParc).nom;
       if (joue === "soundfont") boite.append(reglageInstrument(cible.numero, affectation));
+      if (joue === "faust") boite.append(reglageSynthe(cible.numero, affectation));
       boite.append(reglageTampon(cible.numero));
     }
     return boite;
@@ -377,11 +417,12 @@ export function ouvrirOngletPlan(): void {
       const [i, m, c] = await Promise.all([
         lireJson<Implantation>("/api/implantations/active"),
         lireJson<{ modules: ModuleParc[] }>("/api/maintenance"),
-        lireJson<{ compositions: string[]; defaut: string }>("/api/compositions"),
+        lireJson<{ compositions: string[]; defaut: string; instrumentsFaust?: string[] }>("/api/compositions"),
       ]);
       impl = { nom: i.nom, sections: i.sections ?? [], modules: i.modules ?? {} };
       modules = m.modules ?? [];
       compositions = c.compositions ?? [];
+      instrumentsFaust = c.instrumentsFaust ?? [];
       defautParc = c.defaut || "skini";
       rendre();
     } catch (erreur) {

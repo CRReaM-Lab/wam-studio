@@ -283,10 +283,12 @@ export default class Pedalboard2GUI extends HTMLElement{
                 const categories_map: {[normalized:string]:{count:number,name:string}}={}
                 this.category_to_plugins={}
                 for(const {descriptor} of Object.values(library.plugins)){
+                    // CRReaM : la chaîne d'une piste ne porte que des effets ; les instruments se
+                    // choisissent ailleurs (composition faust ou soundfont du module).
+                    if(descriptor.isInstrument) continue
                     const keywords=[...descriptor.keywords]
                     // Additional keywords
                     if(descriptor.keywords) keywords.push(descriptor.vendor)
-                    if(descriptor.isInstrument) keywords.push("instrument")
 
                     for(const keyword of keywords){
                         const normalized= standardize(keyword)
@@ -333,6 +335,7 @@ export default class Pedalboard2GUI extends HTMLElement{
                 if(!pluginInfo)return
 
                 const {descriptor, classURL}= pluginInfo
+                if(descriptor.isInstrument) return
 
                 // Get thumbnail
                 const src= await (async()=>{
