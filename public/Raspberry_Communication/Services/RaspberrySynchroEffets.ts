@@ -20,6 +20,8 @@ export function demarrerSynchroEffets(params: {
   enLigne: (ip: string) => boolean;
   /** Envoie `/fx <valeur>` au module ; faux : serveur non connecté. */
   envoyer: (ip: string, valeur: string) => boolean;
+  /** Les pédales de la piste sans équivalent sur son module (emplacement laissé vide), à chaque tour. */
+  signaler?: (trackId: number, sansEquivalent: string[]) => void;
 }): void {
   /** Par Pi : ce qui a été envoyé, emplacement par emplacement, et quand tout est reparti. */
   const envoye = new Map<string, { emplacements: string[][]; complet: number }>();
@@ -36,7 +38,8 @@ export function demarrerSynchroEffets(params: {
         suivis.add(b.raspberryIp);
         const effets = await params.pont.decrireEffetsPiste(b.trackId).catch(() => null);
         if (!effets) continue;
-        const { emplacements } = etatEffetsModule(effets);
+        const { emplacements, sautees } = etatEffetsModule(effets);
+        params.signaler?.(b.trackId, sautees);
         const avant = envoye.get(b.raspberryIp);
         const maintenant = Date.now();
         const complet = !avant || maintenant - avant.complet > ETAT_COMPLET_MS;

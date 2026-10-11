@@ -179,17 +179,41 @@ function reglerCase(
   }
 }
 
+/** Par piste suivie en direct : ses pédales sans équivalent sur le module (RaspberrySynchroEffets). */
+const sansEquivalent = new Map<number, string[]>();
+const boutonsFx = new Map<number, { bouton: HTMLButtonElement; binding: RaspberryTrackBinding }>();
+
+/**
+ * Les pédales d'une piste que son module n'a pas (laissées vides) : le bouton « FX » passe à
+ * l'orange et les nomme, au lieu d'un emplacement vide en silence.
+ */
+export function noterEffetsSansEquivalent(trackId: number, noms: string[]): void {
+  const avant = sansEquivalent.get(trackId) ?? [];
+  if (avant.join("\u0000") === noms.join("\u0000")) return;
+  if (noms.length) sansEquivalent.set(trackId, noms);
+  else sansEquivalent.delete(trackId);
+  const b = boutonsFx.get(trackId);
+  if (b) reglerBoutonFx(b.bouton, b.binding);
+}
+
 /** « FX » allumé : les réglages des effets de la piste suivent en direct sur son module. */
 function reglerBoutonFx(bouton: HTMLButtonElement | null | undefined, binding: RaspberryTrackBinding): void {
   if (!bouton) return;
+  boutonsFx.set(binding.trackId, { bouton, binding });
   bouton.style.display = pisteEstLiee(binding) ? "" : "none";
   const actif = binding.fxDirect === true;
+  const manquantes = actif ? sansEquivalent.get(binding.trackId) ?? [] : [];
   bouton.setAttribute("aria-pressed", String(actif));
-  bouton.style.background = actif ? "#1f8b4c" : "transparent";
+  bouton.textContent = manquantes.length ? "FX !" : "FX";
+  bouton.style.background = !actif ? "transparent" : manquantes.length ? "#b7791f" : "#1f8b4c";
+  bouton.style.borderColor = manquantes.length ? "#b7791f" : "#1f8b4c";
   bouton.style.color = actif ? "#fff" : "#9aa1ab";
-  bouton.title = actif
-    ? `Réglages des effets suivis en direct sur rasp ${binding.raspberryId} : toucher pour arrêter.`
-    : `Toucher pour suivre en direct les réglages des effets sur rasp ${binding.raspberryId}.`;
+  bouton.title = !actif
+    ? `Toucher pour suivre en direct les réglages des effets sur rasp ${binding.raspberryId}.`
+    : manquantes.length
+      ? `Sans équivalent sur rasp ${binding.raspberryId}, emplacement laissé vide : ${manquantes.join(", ")}. `
+        + "Les pédales des modules sont dans la bibliothèque « CRReaM — pédales des modules ». Toucher pour arrêter."
+      : `Réglages des effets suivis en direct sur rasp ${binding.raspberryId} : toucher pour arrêter.`;
 }
 
 function assurerBoutonFx(element: HTMLElement, binding: RaspberryTrackBinding): void {
@@ -204,11 +228,14 @@ function assurerBoutonFx(element: HTMLElement, binding: RaspberryTrackBinding): 
     bouton.setAttribute(ATTR_BOUTON_FX, "1");
     bouton.setAttribute("aria-label", "Effets en direct sur le module");
     Object.assign(bouton.style, {
-      marginLeft: "6px", flexShrink: "0", minWidth: "32px", height: "24px", padding: "0 6px",
+      marginLeft: "4px", flexShrink: "0", minWidth: "30px", height: "24px", padding: "0 5px",
       border: "1px solid #1f8b4c", borderRadius: "6px", font: "600 11px system-ui, sans-serif",
       cursor: "pointer", touchAction: "manipulation",
     });
     champNom.parentElement.insertBefore(bouton, champNom.nextSibling);
+    // L'en-tête de piste ne fait que ~160 px et le nom en garde 100 : sans place cédée par le nom,
+    // « FX » et les boutons main / fermer débordent, à moitié cachés.
+    Object.assign(champNom.style, { flex: "1 1 0", minWidth: "0", width: "0" });
     bouton.addEventListener("pointerdown", (event) => event.stopPropagation());
     bouton.addEventListener("click", (event) => {
       event.stopPropagation();

@@ -2,7 +2,10 @@
     "$schema": "../../bank/pedalboard2/static/library_schema.json",
     "name": "Wamstudio Official Pedalboard2 Library",
     "id": "wamstudio.base",
-    "version": [0,0],
+    "version": [
+        0,
+        0
+    ],
     "permissive": true,
     "plugins": [
         "https://mainline.i3s.unice.fr/PedalEditor/Back-End/functional-pedals/published/clarinetMIDI/indexGUIStandard.js",
@@ -31,28 +34,62 @@
         "https://mainline.i3s.unice.fr/PedalEditor/Back-End/functional-pedals/published/untitled6/index.js"
     ],
     "presets": {
+        "CRReaM — pédales des modules": {
+            "description": "Les pédales que les modules ont aussi : elles jouent sur le Pi de la piste (bouton FX)",
+            "category": "library",
+            "state": {
+                "library": "{{BANKURL}}/crream_library.json",
+                "plugins": []
+            }
+        },
         "Piano Echo": {
             "description": "A MIDI Piano with an echo effect",
             "category": "instrument",
             "state": {
-                "plugins":[
-                    {"wam_id":"com.sequencerParty.soundfont", "state":{"instrument":"acoustic_grand_piano"}},
-                    {"wam_id":"Shihong Ren.Faust PingPongDelay", "state":{"/PingPongDelayFaust/bypass":0,"/PingPongDelayFaust/mix":0.5,"/PingPongDelayFaust/time":0.10000000149011612,"/PingPongDelayFaust/feedback":0.30000001192092896}}
+                "plugins": [
+                    {
+                        "wam_id": "com.sequencerParty.soundfont",
+                        "state": {
+                            "instrument": "acoustic_grand_piano"
+                        }
+                    },
+                    {
+                        "wam_id": "Shihong Ren.Faust PingPongDelay",
+                        "state": {
+                            "/PingPongDelayFaust/bypass": 0,
+                            "/PingPongDelayFaust/mix": 0.5,
+                            "/PingPongDelayFaust/time": 0.10000000149011612,
+                            "/PingPongDelayFaust/feedback": 0.30000001192092896
+                        }
+                    }
                 ]
             }
         },
-        "Wam API Library":{
+        "Wam API Library": {
             "description": "A library fetching its WAM from the WAM API",
             "category": "library",
-            "state": { "library": "{{BANKURL}}/wam_api_library.json", "plugins": []}
+            "state": {
+                "library": "{{BANKURL}}/wam_api_library.json",
+                "plugins": []
+            }
         },
-        "Legacy Library":{
+        "Legacy Library": {
             "description": "A library of the plugins hosted in the wam bank",
             "category": "library",
-            "state": { "library": "{{BANKURL}}/plugins/library.json", "plugins": []}
+            "state": {
+                "library": "{{BANKURL}}/plugins/library.json",
+                "plugins": []
+            }
         }
     },
     "includes": [
-        {"id": "wamstudio.pedalboard2.legacy", "version": [0,0], "url": "{{BANKURL}}/local_library.json"}
+        {
+            "id": "wamstudio.pedalboard2.legacy",
+            "version": [
+                0,
+                0
+            ],
+            "url": "{{BANKURL}}/local_library.json"
+        }
     ]
 }

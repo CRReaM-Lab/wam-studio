@@ -14,11 +14,19 @@ export function nomPedalePd(dossier: string): string {
   return dossier.toLowerCase().replace(/[^a-z0-9_]/g, "_");
 }
 
-/** Le dossier d'une pédale d'après son adresse : `…/plugins/sweetWah/index.js` → `sweetWah`. */
-function dossierDepuisAdresse(adresse: string): string | null {
-  const segments = new URL(adresse).pathname.split("/").filter(Boolean);
-  const i = segments.lastIndexOf("plugins");
-  return i >= 0 && segments[i + 1] ? segments[i + 1] : null;
+/**
+ * Le dossier d'une pédale de la banque du serveur d'après son adresse :
+ * `<serveur>/bank/plugins/sweetWah/index.js` → `sweetWah`. Une pédale servie ailleurs (un plugin
+ * en ligne : mainline, webaudiomodules.com) n'a pas d'équivalent sur les modules, qui ne reçoivent
+ * que celles de la banque (`michel module install`) : null. Avant, `…/community/plugins/wimmics/
+ * csoundPitchShifter/…` donnait le nom du fabricant (`wimmics`).
+ */
+export function dossierDepuisAdresse(adresse: string, origine: string = window.location.origin): string | null {
+  const url = new URL(adresse, origine);
+  if (url.origin !== new URL(origine).origin) return null;
+  const segments = url.pathname.split("/").filter(Boolean);
+  const i = segments.indexOf("bank");
+  return i >= 0 && segments[i + 1] === "plugins" && segments[i + 2] ? segments[i + 2] : null;
 }
 
 const tables = new Map<string, Promise<Map<string, string>>>();

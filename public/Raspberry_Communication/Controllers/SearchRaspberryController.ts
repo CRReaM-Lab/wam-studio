@@ -26,6 +26,7 @@ import {
 } from "../utils/agent-transfert/AgentTransfertLogger";
 import {
   brancherLectureRaspberryEnLigne,
+  noterEffetsSansEquivalent,
   rafraichirDisponibiliteCasesLiaison,
 } from "../Services/RaspberryIndicateurPisteUi";
 import {
@@ -320,6 +321,7 @@ export default class SearchRaspberryController {
               enLigne: (ip) => this.state.raspberryMap.get(ip)?.isOnline === true,
               envoyer: (ip, valeur) =>
                 this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: valeur }),
+              signaler: noterEffetsSansEquivalent,
             });
             // Le fader de chaque piste liée : le niveau de son module (/level).
             // Et le master de WAM : tous les modules (/volume, /mute).

@@ -26,7 +26,9 @@ export default class PluginsController {
      * A root plugin can himself manage multiple WAM.
      **/
     readonly WAM_LIST: {[name: string]:{url:string,state?:any}}={
-        "Pedalboard2": { url: BACKEND_URL+"/pedalboard2/index.js", state:{plugins:[],library:BACKEND_URL+"/wamstudio_library.json"} },
+        // CRReaM : par défaut, les pédales que les modules ont aussi (crream_library) : ce qui est choisi
+        // dans la chaîne d'une piste joue aussi sur son Pi (/fx). Les autres bibliothèques restent proposées.
+        "Pedalboard2": { url: BACKEND_URL+"/pedalboard2/index.js", state:{plugins:[],library:BACKEND_URL+"/crream_library.json"} },
     }
 
     /** The default WAM to load */
