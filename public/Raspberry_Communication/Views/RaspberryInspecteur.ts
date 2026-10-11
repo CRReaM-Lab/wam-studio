@@ -23,6 +23,7 @@ import {
 import { lireBibliotheque, type ListeBibliotheque } from "../Services/RaspberryBibliotheque";
 import { FAMILLES_GM } from "../Services/GeneralMidi";
 import { ouvrirOngletPlan } from "./SearchRaspberryFenetrePlan";
+import { ouvrirInterfaceInstrument } from "./RaspberryInterfaceInstrument";
 
 const ID = "raspberry-inspecteur";
 const ID_ACTIONS = "raspberry-inspecteur-actions";
@@ -52,7 +53,8 @@ const STYLE = `
 #${ID} button.action { cursor: pointer; }
 #${ID} .ligne { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 #${ID} .alerte { color: #f0b45a; }
-#${ID} .corps > .titre { display: block; margin-top: 12px; color: #c9ced6; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+#${ID} .corps summary { cursor: pointer; color: #9fb3cf; margin-top: 10px; }
+#${ID} .corps > .titre, #${ID} .corps details > .titre { display: block; margin-top: 12px; color: #c9ced6; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 #${ID_ACTIONS} { flex: 0 0 170px; display: flex; flex-direction: column; gap: 2px; padding: 4px; overflow: auto;
   border-left: 1px solid #262a31; background: #16191d; }
 #${ID_ACTIONS} .new-track { width: auto; min-height: 0; margin: 0; padding: 6px 8px; flex-direction: row-reverse;
@@ -76,7 +78,12 @@ export type ParametreInstrument = {
   unite?: string;
   cc?: number;
 };
-type ParametresInstruments = { instruments: Record<string, ParametreInstrument[]>; fiches: Record<string, string> };
+type ParametresInstruments = {
+  instruments: Record<string, ParametreInstrument[]>;
+  fiches: Record<string, string>;
+  /** Le plugin WAM de l'instrument (`/bank/plugins/JUNO6v2/index.js`), dont on ouvre l'interface. */
+  interfaces?: Record<string, string>;
+};
 type Section = { id: string; nom: string };
 type Contexte = {
   modules: ModuleParc[];
@@ -353,20 +360,46 @@ export function demarrerInspecteur(pont: IWamPistesPont): void {
       return;
     }
     const retenus = () => lireAffectationCompositions().reglagesSynthes?.[String(numero)]?.[synthe] ?? {};
-    const envoyer = async (p: ParametreInstrument, v: number) => {
+    const envoyerNom = async (nom: string, v: number) => {
       // Régler un paramètre fixe le synthé du module : la lecture le renverra avec ses réglages.
       if (!lireAffectationCompositions().synthes[String(numero)]) affecterSynthe(numero, synthe);
-      affecterReglageSynthe(numero, synthe, p.nom, v);
+      affecterReglageSynthe(numero, synthe, nom, v);
       if (!ip || !enLigne) {
         etat.textContent = "Retenu ; part au module à la prochaine lecture (hors ligne).";
         return;
       }
-      const erreur = await osc(ip, "/synth", `tous ${p.nom} ${v}`);
+      const erreur = await osc(ip, "/synth", `tous ${nom} ${v}`);
       etat.textContent = erreur ? `Échec : ${erreur}` : "";
     };
+    const envoyer = (p: ParametreInstrument, v: number) => envoyerNom(p.nom, v);
     const valeurs = retenus();
+    // L'interface d'origine de l'instrument (son plugin WAM), dans une fenêtre à part ; la liste
+    // des paramètres reste dessous, repliée.
+    const url = contexte.parametres.interfaces?.[synthe];
+    let conteneur: HTMLElement = corps;
+    if (url) {
+      const ligne = el("div", "", "ligne");
+      const ouvrir = el("button", `Ouvrir l'interface de ${synthe}`, "action");
+      ouvrir.type = "button";
+      ouvrir.onclick = () =>
+        void ouvrirInterfaceInstrument({
+          pont,
+          url,
+          synthe,
+          numero,
+          valeurs: { ...Object.fromEntries(parametres.map((p) => [p.nom, p.init])), ...retenus() },
+          noms: new Set(parametres.map((p) => p.nom)),
+          surReglage: (nom, v) => void envoyerNom(nom, v),
+        });
+      ligne.append(ouvrir, el("span", "chaque geste part au module ; le plugin ne sonne pas dans WAM", "aide"));
+      corps.append(ligne);
+      const details = el("details");
+      details.append(el("summary", "Liste des paramètres"));
+      corps.append(details);
+      conteneur = details;
+    }
     for (const g of groupesParametres(parametres)) {
-      corps.append(el("div", g.groupe, "titre"));
+      conteneur.append(el("div", g.groupe, "titre"));
       const grille = el("div", "", "grille");
       for (const p of g.parametres) {
         const valeur = valeurs[p.nom] ?? p.init;
@@ -399,7 +432,7 @@ export function demarrerInspecteur(pont: IWamPistesPont): void {
           grille.append(curseur(titre, p.min, p.max, p.pas > 0 ? p.pas : pasParametre({ ...p, discret: false }), valeur, regulier<number>(80, (v) => void envoyer(p, v))));
         }
       }
-      corps.append(grille);
+      conteneur.append(grille);
     }
     const ligne = el("div", "", "ligne");
     const fiche = el("button", "Revenir aux valeurs de la fiche", "action");

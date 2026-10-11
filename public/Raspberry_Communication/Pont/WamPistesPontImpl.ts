@@ -4,7 +4,7 @@ import OperableAudioBuffer from "../../src/Audio/OperableAudioBuffer";
 import type { ProjectData } from "../../src/Loader/Loader";
 import SampleRegion from "../../src/Models/Region/SampleRegion";
 import { pedalePd } from "../Services/PedalesPd";
-import type { EffetDecrit, IWamPistesPont, ReglagesEffet, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
+import type { EffetDecrit, IWamPistesPont, InterfaceWamOuverte, ReglagesEffet, PisteRaspberryCreee, PositionLibelleRegion, PositionMarqueurPiste, RegionAjouteePiste, RegionAudioPiste, RegionPisteRaspberry, SessionProjetLocale } from "../Interfaces/IWamPistesPont";
 import { creerBinding } from "../Models/RaspberryTrackBinding";
 import { appliquerIndicateurRaspberry } from "../Services/RaspberryIndicateurPisteUi";
 import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingStore";
@@ -158,6 +158,90 @@ export default class WamPistesPontImpl implements IWamPistesPont {
         })),
       };
     });
+  }
+
+  public async ouvrirInterfaceWam(url: string, surChangement: (id: string, valeur: number) => void): Promise<InterfaceWamOuverte | null> {
+    type Noeud = {
+      getParameterInfo(): Promise<Record<string, unknown>>;
+      getParameterValues(normalise: boolean): Promise<Record<string, { value: number }>>;
+      setParameterValues(v: Record<string, { id: string; value: number; normalized: boolean }>): Promise<void>;
+      destroy?(): void;
+    };
+    type Connexion = {
+      addAllParameterListener(f: (e: { endpointID: string; value: number }) => void): void;
+      removeAllParameterListener?(f: (e: { endpointID: string; value: number }) => void): void;
+      sendEventOrValue(id: string, valeur: number): void;
+      requestParameterValue?(id: string): void;
+    };
+    try {
+      const { default: Wam } = (await import(/* webpackIgnore: true */ url)) as {
+        default: { createInstance(groupe: string, ctx: BaseAudioContext): Promise<{ audioNode: Noeud; createGui(): Promise<Element>; destroyGui?(gui: Element): void; patchConnection?: Connexion }> };
+      };
+      const host = this.app.host;
+      const instance = await Wam.createInstance(host.hostGroupId, host.audioContext);
+      const gui = await instance.createGui();
+      const parametres = Object.keys(await instance.audioNode.getParameterInfo());
+      const connexion = instance.patchConnection;
+      // Les valeurs données par `regler` : pas des gestes de l'interface.
+      const imposees = new Map<string, number>();
+      const connues = new Map<string, number>();
+      // Égales à l'arrondi float32 près (61.4173 revient du patch en 61.41730117).
+      const egales = (a: number, b: number) => Math.abs(a - b) <= 1e-5 * Math.max(1, Math.abs(a));
+      // Le temps que l'interface se mette en place (elle peut régler d'elle-même, Pro54 ses voix) :
+      // ce qui change alors est la référence, pas un geste.
+      const enPlaceA = performance.now() + 1500;
+      const rapporter = (id: string, valeur: number) => {
+        if (!Number.isFinite(valeur)) return;
+        const imposee = imposees.get(id);
+        if (imposee !== undefined && egales(imposee, valeur)) {
+          imposees.delete(id);
+          connues.set(id, valeur);
+          return;
+        }
+        const avant = connues.get(id);
+        connues.set(id, valeur);
+        // La première valeur d'un paramètre (le patch les annonce toutes à l'ouverture) : la référence.
+        if (avant === undefined || egales(avant, valeur) || performance.now() < enPlaceA) return;
+        surChangement(id, valeur);
+      };
+      let minuterie: number | undefined;
+      let ecoute: ((e: { endpointID: string; value: number }) => void) | undefined;
+      if (connexion?.addAllParameterListener) {
+        // Cmajor : l'interface parle au patch, qui annonce chaque valeur.
+        ecoute = (e) => rapporter(e.endpointID, Number(e.value));
+        connexion.addAllParameterListener(ecoute);
+      } else {
+        // Faust et les autres : les valeurs relues dix fois par seconde (la première lecture sert de référence).
+        const valeurs = await instance.audioNode.getParameterValues(false);
+        for (const [id, v] of Object.entries(valeurs)) connues.set(id, v.value);
+        minuterie = window.setInterval(async () => {
+          const v = await instance.audioNode.getParameterValues(false).catch(() => ({}) as Record<string, { value: number }>);
+          for (const [id, x] of Object.entries(v)) rapporter(id, x.value);
+        }, 100);
+      }
+      return {
+        gui,
+        parametres,
+        regler: (id, valeur) => {
+          imposees.set(id, valeur);
+          if (connexion) connexion.sendEventOrValue(id, valeur);
+          else void instance.audioNode.setParameterValues({ [id]: { id, value: valeur, normalized: false } });
+        },
+        fermer: () => {
+          if (minuterie !== undefined) window.clearInterval(minuterie);
+          if (ecoute) connexion?.removeAllParameterListener?.(ecoute);
+          try {
+            instance.destroyGui?.(gui);
+            instance.audioNode.destroy?.();
+          } catch {
+            /* déjà détruit */
+          }
+        },
+      };
+    } catch (erreur) {
+      console.warn("[raspberry] interface WAM", url, erreur);
+      return null;
+    }
   }
 
   public async reglerEffet(trackId: number, id: string, valeur: number): Promise<void> {

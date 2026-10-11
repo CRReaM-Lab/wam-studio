@@ -34,6 +34,16 @@ export type ParametreEffet = {
   choix: string[];
 };
 
+/** L'interface d'un plugin WAM ouverte à part (un instrument des modules, réglé par son GUI). */
+export type InterfaceWamOuverte = {
+  gui: Element;
+  /** Les identifiants de ses paramètres (adresse Faust, endpointID Cmajor). */
+  parametres: string[];
+  /** Donne une valeur à un paramètre (sans la rapporter comme un changement). */
+  regler(id: string, valeur: number): void;
+  fermer(): void;
+};
+
 /** Les réglages d'une pédale, à sa place dans la chaîne. */
 export type ReglagesEffet = { position: number; nom: string; parametres: ParametreEffet[] };
 
@@ -83,6 +93,13 @@ export interface IWamPistesPont {
 
   /** Les réglages de chaque pédale du pedalboard de la piste, dans l'ordre de la chaîne ; [] sans pedalboard. */
   lireReglagesEffets(trackId: number): Promise<ReglagesEffet[]>;
+
+  /**
+   * Ouvre un plugin WAM (`/bank/plugins/JUNO6v2/index.js`) pour son interface seulement : instancié
+   * dans le contexte de WAM, pas branché à la sortie. `surChangement` reçoit chaque réglage fait
+   * dans l'interface. null : le plugin ne s'ouvre pas.
+   */
+  ouvrirInterfaceWam(url: string, surChangement: (id: string, valeur: number) => void): Promise<InterfaceWamOuverte | null>;
 
   /** Règle un paramètre d'une pédale de la piste (identifiant de `lireReglagesEffets`). */
   reglerEffet(trackId: number, id: string, valeur: number): Promise<void>;
