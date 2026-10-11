@@ -170,10 +170,21 @@ export function texteEtiquetteMarqueur(marqueur: {
   return apercu || marqueur.libelle || "OSC";
 }
 
+/**
+ * Un gain OSC des modules (`/level`, `/play`, `/attenuation`) en volume de piste WAM. Pd le lit
+ * en `dbtorms` : la valeur moins 100 donne les dB (100 = 0 dB, 80 = −20 dB, 0 = silence) ; WAM
+ * applique le volume de piste en gain linéaire (0 à 1).
+ */
 export function gainOscVersVolumePiste(gainTexte: string): number {
-  const gain = Number.parseFloat(gainTexte);
-  if (!Number.isFinite(gain)) {
-    return Number.parseFloat(GAIN_OSC_DEFAUT) / GAIN_OSC_MAX;
-  }
-  return Math.min(1, Math.max(0, gain / GAIN_OSC_MAX));
+  const parse = Number.parseFloat(gainTexte);
+  const gain = Number.isFinite(parse) ? parse : Number.parseFloat(GAIN_OSC_DEFAUT);
+  if (gain <= 0) return 0;
+  return Math.min(1, Math.pow(10, (gain - 100) / 20));
+}
+
+/** Le volume d'une piste WAM (gain linéaire, 0 à 1) en niveau Pd (`dbtorms`, 0 à 100). */
+export function volumePisteVersNiveauPd(volume01: number): number {
+  if (!(volume01 > 0)) return 0;
+  const niveau = 100 + 20 * Math.log10(Math.min(1, volume01));
+  return Math.max(0, Math.round(niveau * 10) / 10);
 }

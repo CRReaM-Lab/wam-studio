@@ -79,6 +79,8 @@ class RaspberryTrackBindingStore {
       sonNumber: binding.sonNumber,
       liee: binding.liee !== false,
       ...(binding.fxDirect ? { fxDirect: true } : {}),
+      ...(typeof binding.niveau === "number" ? { niveau: binding.niveau } : {}),
+      ...(binding.muet ? { muet: true } : {}),
     };
   }
 

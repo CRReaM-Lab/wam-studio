@@ -12,6 +12,10 @@ export type RaspberryTrackBinding = {
   liee: boolean;
   /** Les réglages des effets de la piste suivis en direct sur le module (/fx). */
   fxDirect?: boolean;
+  /** Le niveau du module choisi au fader de la piste (Pd, 100 = 0 dB) ; absent : jamais touché. */
+  niveau?: number;
+  /** La piste coupée (bouton M) : le module reçoit /level 0. */
+  muet?: boolean;
 };
 
 export type RaspberryTrackBindingPersiste = {
@@ -20,6 +24,8 @@ export type RaspberryTrackBindingPersiste = {
   sonNumber: number;
   liee?: boolean;
   fxDirect?: boolean;
+  niveau?: number;
+  muet?: boolean;
 };
 
 export function creerBinding(
@@ -39,5 +45,7 @@ export function bindingDepuisPersiste(
   return {
     ...creerBinding(trackId, donnees.ip, donnees.raspberryId, donnees.sonNumber ?? SON_NUMERO_DEFAUT, donnees.liee !== false),
     fxDirect: donnees.fxDirect === true,
+    ...(typeof donnees.niveau === "number" && Number.isFinite(donnees.niveau) ? { niveau: donnees.niveau } : {}),
+    ...(donnees.muet ? { muet: true } : {}),
   };
 }

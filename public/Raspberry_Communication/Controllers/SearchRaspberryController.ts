@@ -94,6 +94,7 @@ import { ouvrirFenetreImportAudio } from "../Views/SearchRaspberryFenetreImportA
 import { ouvrirMenuRegion } from "../Views/SearchRaspberryMenuRegion";
 import { demarrerLectureServeur } from "../Services/RaspberryLectureServeur";
 import { demarrerSynchroEffets } from "../Services/RaspberrySynchroEffets";
+import { demarrerSynchroNiveaux } from "../Services/RaspberrySynchroNiveaux";
 import { EMPLACEMENTS_FX, etatEffetsModule } from "../Services/RaspberryEffetsModule";
 import { ecrireCueEnAttente, lireCueEnAttente } from "../Services/RaspberryMarqueursCueEtat";
 import { lireMarqueursSequenceur } from "../Services/RaspberryMarqueursStore";
@@ -317,6 +318,13 @@ export default class SearchRaspberryController {
               enLigne: (ip) => this.state.raspberryMap.get(ip)?.isOnline === true,
               envoyer: (ip, valeur) =>
                 this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: valeur }),
+            });
+            // Le fader de chaque piste liée : le niveau de son module (/level).
+            demarrerSynchroNiveaux({
+              liaisons: () => raspberryTrackBindingStore.tous(),
+              enLigne: (ip) => this.state.raspberryMap.get(ip)?.isOnline === true,
+              envoyer: (ip, valeur) =>
+                this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/level", OSCValue: valeur }),
             });
             // Une seule lecture : Play dans WAM joue aussi sur les Pi, par le serveur.
             demarrerLectureServeur({

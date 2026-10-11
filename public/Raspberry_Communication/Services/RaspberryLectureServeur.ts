@@ -13,6 +13,21 @@ import { parserAdresseOscPersonnalisee } from "./RaspberryMarqueursSequenceur";
 import { lireMarqueursSequenceur } from "./RaspberryMarqueursStore";
 import type { EvenementSequenceurOsc } from "./RaspberrySequenceurOscService";
 import { lireAffectationCompositions } from "./RaspberryCompositionsStore";
+import { niveauxParModule } from "./RaspberrySynchroNiveaux";
+import { raspberryTrackBindingStore } from "./RaspberryTrackBindingStore";
+
+/**
+ * Les niveaux des faders de piste, au départ de la lecture : /level à chaque module dont le fader
+ * a été touché (une composition rechargée repart à 100 ; le serveur les envoie après son chargement).
+ */
+export function evenementsNiveaux(departMs: number): EvenementProgramme[] {
+  return [...niveauxParModule(raspberryTrackBindingStore.tous())].map(([ip, niveau]) => ({
+    tMs: departMs,
+    ip,
+    adresse: "/level",
+    valeur: String(niveau),
+  }));
+}
 
 /**
  * Les instruments soundfont du projet, au départ de la lecture : /bank puis /pgm à chaque module
@@ -98,6 +113,7 @@ export function demarrerLectureServeur(params: {
         affectation: lireAffectationCompositions(),
         evenements: [
           ...evenementsInstruments(Math.round(positionArret), params.ipDuModule),
+          ...evenementsNiveaux(Math.round(positionArret)),
           ...construireProgrammeServeur(params.regions()),
         ],
       });

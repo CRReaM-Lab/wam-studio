@@ -4,6 +4,7 @@ import {
   lireNumeroRaspberryDepuisNomPiste,
 } from "../utils/agent-transfert/AgentTransfertHelpers";
 import { raspberryTrackBindingStore } from "./RaspberryTrackBindingStore";
+import { volumePisteVersNiveauPd } from "../utils/osc/CommandesOscMarqueur";
 import {
   protegerNomPisteRaspberry,
   retirerProtectionNomPiste,
@@ -12,6 +13,7 @@ import {
 const ATTR_RASPBERRY_LIE = "data-raspberry-lie";
 const ATTR_CASE_LIAISON = "data-raspberry-case-liaison";
 const ATTR_BOUTON_FX = "data-raspberry-fx-direct";
+const ATTR_SUIVI_FADER = "data-raspberry-suivi-fader";
 const STYLE_BORDURE_LIE = "4px solid #1f8b4c";
 const STYLE_BORDURE_DELIE = "4px solid #6b7280";
 
@@ -38,7 +40,40 @@ export function appliquerIndicateurRaspberry(
 ): void {
   assurerCaseLiaison(piste.element, binding);
   assurerBoutonFx(piste.element, binding);
+  assurerSuiviFader(piste.element);
   appliquerEtatLiaison(piste, binding);
+}
+
+/**
+ * Le fader et le bouton M de la piste, touchés à la main : retenus dans la liaison, que
+ * RaspberrySynchroNiveaux envoie au module en `/level`. Un fader bougé par un marqueur pendant la
+ * lecture ne passe pas par ici (pas d'évènement du navigateur) : il reste à l'écoute dans WAM.
+ */
+function assurerSuiviFader(element: HTMLElement): void {
+  const racine = element.shadowRoot;
+  const fader = racine?.getElementById("volume-slider") as HTMLInputElement | null;
+  const muet = racine?.getElementById("mute-btn");
+  if (!fader || !muet || fader.hasAttribute(ATTR_SUIVI_FADER)) return;
+  fader.setAttribute(ATTR_SUIVI_FADER, "1");
+  const retenir = (changer: (b: RaspberryTrackBinding) => void) => {
+    const trackId = lireTrackIdCase(element);
+    const b = trackId === null ? undefined : raspberryTrackBindingStore.trouverParTrackId(trackId);
+    if (!b) return;
+    changer(b);
+    raspberryTrackBindingStore.enregistrer(b);
+  };
+  fader.addEventListener("input", () => {
+    retenir((b) => { b.niveau = volumePisteVersNiveauPd(fader.valueAsNumber / 100); });
+  });
+  // WAM bascule le mute dans son propre écouteur : lire l'état une fois qu'il est passé.
+  muet.addEventListener("click", () => {
+    window.setTimeout(() => {
+      retenir((b) => {
+        b.muet = muet.classList.contains("_red");
+        if (typeof b.niveau !== "number") b.niveau = volumePisteVersNiveauPd(fader.valueAsNumber / 100);
+      });
+    }, 0);
+  });
 }
 
 export function rafraichirDisponibiliteCasesLiaison(): void {
