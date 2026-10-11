@@ -1,5 +1,6 @@
 import { monterFenetre } from "./PanneauPiSon";
 import { ouvrirEditeurKit } from "./SearchRaspberryFenetreKit";
+import { ouvrirImportDossier } from "./SearchRaspberryFenetreImportDossier";
 import { FAMILLES_GM, nomGeneralMidi } from "../Services/GeneralMidi";
 import {
   envoyerAuxModules,
@@ -390,7 +391,20 @@ export function ouvrirOngletPlan(): void {
     kit.type = "button";
     Object.assign(kit.style, { minHeight: "44px", marginTop: "8px", marginLeft: "6px" });
     kit.onclick = () => ouvrirEditeurKit({ pourModule: numero });
-    bloc.append(importer, fichier, kit);
+    // Ou tout un dossier : SoundFonts, SFZ et leurs sons, dossiers de sons en kits.
+    const dossier = el("input");
+    Object.assign(dossier, { type: "file", multiple: true });
+    dossier.setAttribute("webkitdirectory", "");
+    dossier.style.display = "none";
+    dossier.onchange = () => {
+      const f = [...(dossier.files ?? [])];
+      if (f.length) ouvrirImportDossier(f);
+    };
+    const importerDossier = el("button", "Importer un dossier…");
+    importerDossier.type = "button";
+    Object.assign(importerDossier.style, { minHeight: "44px", marginTop: "8px", marginLeft: "6px" });
+    importerDossier.onclick = () => dossier.click();
+    bloc.append(importer, fichier, kit, importerDossier, dossier);
 
     const message = messagesInstrument.get(numero);
     if (message) bloc.append(el("div", message, "aide"));

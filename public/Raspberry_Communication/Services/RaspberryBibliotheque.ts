@@ -132,3 +132,28 @@ export async function fabriquerKit(nom: string, cases: CaseKit[], remplacer = fa
   if (!r.ok || !j.instrument) throw new Error([j.error, ...(j.problemes ?? [])].filter(Boolean).join(" ; ") || `${r.status}`);
   return j.instrument;
 }
+
+/**
+ * Un instrument SFZ vers la bibliothèque : son texte et ses sons (chemins relatifs au fichier
+ * SFZ) ; les sons qui ne sont pas des WAV sont décodés ici (le serveur ne lit que le WAV) et
+ * gardent leur chemin. Le serveur fabrique la SoundFont et dit ce qui n'a pas d'équivalent.
+ */
+export async function importerSfz(
+  nom: string,
+  sfz: File,
+  sons: { chemin: string; fichier: File }[],
+  enWav: (son: Blob, nom: string) => Promise<File>,
+  remplacer = false,
+): Promise<InstrumentBibliotheque> {
+  if (!nomValide(nom)) throw new Error(`nom « ${nom} » : lettres, chiffres, _ et - seulement`);
+  const formulaire = new FormData();
+  formulaire.append("nom", nom);
+  formulaire.append("remplacer", String(remplacer));
+  formulaire.append("sfz", sfz, sfz.name);
+  formulaire.append("chemins", JSON.stringify(sons.map((s) => s.chemin)));
+  for (const [i, s] of sons.entries()) formulaire.append(`son${i}`, await enWav(s.fichier, s.fichier.name), s.fichier.name);
+  const r = await fetch(`${PREFIXE}/sfz`, { method: "POST", body: formulaire });
+  const j = (await r.json().catch(() => ({}))) as { error?: string; problemes?: string[]; instrument?: InstrumentBibliotheque };
+  if (!r.ok || !j.instrument) throw new Error([j.error, ...(j.problemes ?? [])].filter(Boolean).join(" ; ") || `${r.status}`);
+  return j.instrument;
+}

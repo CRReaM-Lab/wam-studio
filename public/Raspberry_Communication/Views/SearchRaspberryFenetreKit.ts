@@ -47,8 +47,11 @@ function bouton(texte: string, action: () => void | Promise<void>): HTMLButtonEl
 
 const texteErreur = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** Ouvre l'éditeur ; `pourModule` : le module qui jouera le kit une fois fabriqué. */
-export function ouvrirEditeurKit(options: { pourModule?: number } = {}): void {
+/**
+ * Ouvre l'éditeur ; `pourModule` : le module qui jouera le kit une fois fabriqué ; `nom` et
+ * `cases` : un kit à reprendre (import d'un dossier), `remplacer` : le refabriquer sous son nom.
+ */
+export function ouvrirEditeurKit(options: { pourModule?: number; nom?: string; cases?: Case[]; remplacer?: boolean } = {}): void {
   document.getElementById(ID_OVERLAY)?.remove();
   const overlay = el("div");
   overlay.id = ID_OVERLAY;
@@ -62,8 +65,8 @@ export function ouvrirEditeurKit(options: { pourModule?: number } = {}): void {
   fenetre.appendChild(corps);
   monterFenetre(overlay);
 
-  let nom = "kit-1";
-  let cases: Case[] = [];
+  let nom = options.nom ?? "kit-1";
+  let cases: Case[] = (options.cases ?? []).map((c) => ({ ...c }));
   let message = "";
   let occupe = false;
   // La recherche freesound : pour quelle case, et ses résultats.
@@ -110,7 +113,7 @@ export function ouvrirEditeurKit(options: { pourModule?: number } = {}): void {
     occupe = true;
     dire("Fabrication de la SoundFont…");
     try {
-      const i = await fabriquerKit(nom, cases.map(({ libelleSon: _, ...c }) => c));
+      const i = await fabriquerKit(nom, cases.map(({ libelleSon: _, ...c }) => c), options.remplacer === true && nom === options.nom);
       if (options.pourModule !== undefined) affecterInstrument(options.pourModule, { programme: 0, banque: 0, soundfont: i.nom });
       occupe = false;
       dire(`« ${i.nom} » fabriqué (${(i.taille / 1e6).toFixed(1)} Mo)${i.avertissements.length ? ` — attention : ${i.avertissements.join(" ; ")}` : ""}.`
@@ -237,7 +240,7 @@ export function ouvrirEditeurKit(options: { pourModule?: number } = {}): void {
   const rendre = () => {
     corps.replaceChildren();
     const tete = el("div", "", "ligne");
-    tete.append(bouton("← Plan", () => ouvrirOngletPlan()), el("strong", "Nouveau kit"));
+    tete.append(bouton("← Plan", () => ouvrirOngletPlan()), el("strong", options.nom ? `Kit ${options.nom}` : "Nouveau kit"));
     corps.append(tete);
     corps.append(el("div", "Les sons entrent dans la bibliothèque du serveur ; il en fabrique une SoundFont, jouée par les modules dans la composition soundfont (programme 0). Le gain et le timbre sont intégrés aux sons.", "aide"));
     const ligneNom = el("div", "", "ligne");
