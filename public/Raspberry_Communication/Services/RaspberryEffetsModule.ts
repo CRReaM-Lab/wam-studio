@@ -36,7 +36,9 @@ export function etatEffetsModule(effets: EffetDecrit[]): EtatEffetsModule {
     chargees.push(e.objetPd);
     const lignes = [`${n} charge ${e.objetPd}`];
     for (const [adresse, valeur] of Object.entries((e.etat ?? {}) as Record<string, unknown>)) {
-      const parametre = adresse.split("/").filter(Boolean).pop();
+      // Comme les adresses de Faust et l'objet Pd (michel) : `Super Wet` → `Super_Wet`. Avec
+      // l'espace, `/fx` était coupé en deux : le module recevait `Super`.
+      const parametre = adresse.split("/").filter(Boolean).pop()?.trim().replace(/\s+/g, "_");
       const nombre = Number(valeur);
       if (parametre && Number.isFinite(nombre)) lignes.push(`${n} ${parametre} ${nombre}`);
     }
