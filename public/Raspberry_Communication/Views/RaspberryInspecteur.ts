@@ -13,7 +13,9 @@ import { raspberryTrackBindingStore } from "../Services/RaspberryTrackBindingSto
 import {
   affecterInstrument,
   affecterLimiteur,
+  affecterReglageSynthe,
   affecterSynthe,
+  ecrireAffectationCompositions,
   compositionDuModule,
   EVENEMENT_COMPOSITIONS,
   lireAffectationCompositions,
@@ -50,6 +52,7 @@ const STYLE = `
 #${ID} button.action { cursor: pointer; }
 #${ID} .ligne { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 #${ID} .alerte { color: #f0b45a; }
+#${ID} .corps > .titre { display: block; margin-top: 12px; color: #c9ced6; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 #${ID_ACTIONS} { flex: 0 0 170px; display: flex; flex-direction: column; gap: 2px; padding: 4px; overflow: auto;
   border-left: 1px solid #262a31; background: #16191d; }
 #${ID_ACTIONS} .new-track { width: auto; min-height: 0; margin: 0; padding: 6px 8px; flex-direction: row-reverse;
@@ -59,6 +62,21 @@ const STYLE = `
 `;
 
 type ModuleParc = { numero: number; ip: string; enLigne: boolean };
+/** Un paramètre d'un instrument des modules (`instruments-parametres.json`, relevé par michel). */
+export type ParametreInstrument = {
+  nom: string;
+  libelle: string;
+  groupe: string;
+  genre: "curseur" | "interrupteur" | "bouton";
+  min: number;
+  max: number;
+  init: number;
+  pas: number;
+  choix: string[];
+  unite?: string;
+  cc?: number;
+};
+type ParametresInstruments = { instruments: Record<string, ParametreInstrument[]>; fiches: Record<string, string> };
 type Section = { id: string; nom: string };
 type Contexte = {
   modules: ModuleParc[];
@@ -67,7 +85,23 @@ type Contexte = {
   compositionParc: string;
   instrumentsFaust: string[];
   bibliotheque: ListeBibliotheque;
+  parametres: ParametresInstruments;
 };
+
+/**
+ * Les paramètres d'un instrument rangés par groupe, dans l'ordre : le groupe Faust (`MAIN/VCF` →
+ * `VCF`), ou pour Cmajor (sans groupe) le premier mot du libellé (`Filter Cutoff` → `Filter`). Pur.
+ */
+export function groupesParametres(parametres: ParametreInstrument[]): { groupe: string; parametres: ParametreInstrument[] }[] {
+  const groupes: { groupe: string; parametres: ParametreInstrument[] }[] = [];
+  for (const p of parametres) {
+    const groupe = p.groupe ? p.groupe.split("/").filter((g) => g !== "MAIN").join(" · ") || p.groupe : p.libelle.split(" ")[0];
+    let g = groupes.find((x) => x.groupe === groupe);
+    if (!g) groupes.push((g = { groupe, parametres: [] }));
+    g.parametres.push(p);
+  }
+  return groupes;
+}
 
 /** Les onglets d'une piste : l'instrument, une pédale par onglet, la sortie, le MIDI. Pur, pour les tests. */
 export function ongletsInspecteur(effets: { nom: string; objetPd: string | null }[]): { cle: string; libelle: string; sansEquivalent: boolean }[] {
@@ -183,7 +217,10 @@ export function demarrerInspecteur(pont: IWamPistesPont): void {
   const corps = el("div", "", "corps");
   racine.append(tete, nav, corps);
 
-  let contexte: Contexte = { modules: [], sections: [], sectionDe: {}, compositionParc: "skini", instrumentsFaust: [], bibliotheque: { instruments: [], surLesPi: {} } };
+  let contexte: Contexte = {
+    modules: [], sections: [], sectionDe: {}, compositionParc: "skini", instrumentsFaust: [],
+    bibliotheque: { instruments: [], surLesPi: {} }, parametres: { instruments: {}, fiches: {} },
+  };
   let onglet = "instrument";
   let cleRendue = "";
   let effets: { nom: string; objetPd: string | null }[] = [];
@@ -205,7 +242,11 @@ export function demarrerInspecteur(pont: IWamPistesPont): void {
         instrumentsFaust: c.instrumentsFaust ?? [],
       };
       contexte.bibliotheque = await lireBibliotheque().catch(() => contexte.bibliotheque);
-      cleRendue = "";
+      contexte.parametres = await fetch("/api/instruments/parametres")
+        .then((r) => (r.ok ? r.json() : contexte.parametres))
+        .catch(() => contexte.parametres);
+      // Pas de redessin sous la main de qui tient un réglage.
+      if (!corps.contains(document.activeElement)) cleRendue = "";
     } catch {
       /* serveur injoignable : on garde le dernier contexte */
     }
@@ -247,7 +288,8 @@ export function demarrerInspecteur(pont: IWamPistesPont): void {
         if (select.value) void envoyer("/instrument", select.value);
       };
       ligne.append(select);
-      corps.append(ligne, el("div", "Les réglages du synthé (filtre, enveloppes…) viendront ici, lus sur le module.", "aide"));
+      corps.append(ligne);
+      rendreReglagesSynthe(numero, choisi || contexte.parametres.fiches[String(numero)] || "", ip, enLigne, etat);
     } else if (composition.nom === "soundfont") {
       const choisi = affectation.instruments[String(numero)];
       const sf = choisi?.soundfont ?? "";
@@ -297,6 +339,87 @@ export function demarrerInspecteur(pont: IWamPistesPont): void {
     const bas = el("div", "", "ligne");
     bas.append(plan);
     corps.append(etat, bas);
+  };
+
+  /** Les réglages du synthé que joue le module (`/synth tous <paramètre> <valeur>`), par groupe. */
+  const rendreReglagesSynthe = (numero: number, synthe: string, ip: string | undefined, enLigne: boolean, etat: HTMLElement) => {
+    if (!synthe) {
+      corps.append(el("div", "Choisir un synthé pour régler ses paramètres.", "aide"));
+      return;
+    }
+    const parametres = contexte.parametres.instruments[synthe] ?? [];
+    if (!parametres.length) {
+      corps.append(el("div", `Paramètres de ${synthe} inconnus du serveur (michel module publier les relève).`, "aide"));
+      return;
+    }
+    const retenus = () => lireAffectationCompositions().reglagesSynthes?.[String(numero)]?.[synthe] ?? {};
+    const envoyer = async (p: ParametreInstrument, v: number) => {
+      // Régler un paramètre fixe le synthé du module : la lecture le renverra avec ses réglages.
+      if (!lireAffectationCompositions().synthes[String(numero)]) affecterSynthe(numero, synthe);
+      affecterReglageSynthe(numero, synthe, p.nom, v);
+      if (!ip || !enLigne) {
+        etat.textContent = "Retenu ; part au module à la prochaine lecture (hors ligne).";
+        return;
+      }
+      const erreur = await osc(ip, "/synth", `tous ${p.nom} ${v}`);
+      etat.textContent = erreur ? `Échec : ${erreur}` : "";
+    };
+    const valeurs = retenus();
+    for (const g of groupesParametres(parametres)) {
+      corps.append(el("div", g.groupe, "titre"));
+      const grille = el("div", "", "grille");
+      for (const p of g.parametres) {
+        const valeur = valeurs[p.nom] ?? p.init;
+        const titre = `${p.libelle}${p.unite ? ` (${p.unite})` : ""}`;
+        if (p.choix.length) {
+          const l = el("div", "", "reglage");
+          const select = el("select");
+          p.choix.forEach((c, i) => select.append(new Option(c, String(p.min + i))));
+          select.value = String(Math.round(valeur));
+          select.onchange = () => void envoyer(p, Number(select.value));
+          l.append(el("label", titre), select);
+          grille.append(l);
+        } else if (p.genre === "interrupteur") {
+          const l = el("div", "", "reglage");
+          const coche = el("input");
+          coche.type = "checkbox";
+          coche.checked = valeur >= 0.5;
+          coche.onchange = () => void envoyer(p, coche.checked ? 1 : 0);
+          l.append(el("label", titre), coche);
+          grille.append(l);
+        } else if (p.genre === "bouton") {
+          const l = el("div", "", "reglage");
+          const b = el("button", "●", "action");
+          b.type = "button";
+          b.onpointerdown = () => void envoyer(p, 1);
+          b.onpointerup = b.onpointerleave = () => void envoyer(p, 0);
+          l.append(el("label", titre), b);
+          grille.append(l);
+        } else {
+          grille.append(curseur(titre, p.min, p.max, p.pas > 0 ? p.pas : pasParametre({ ...p, discret: false }), valeur, regulier<number>(80, (v) => void envoyer(p, v))));
+        }
+      }
+      corps.append(grille);
+    }
+    const ligne = el("div", "", "ligne");
+    const fiche = el("button", "Revenir aux valeurs de la fiche", "action");
+    fiche.type = "button";
+    fiche.disabled = !Object.keys(valeurs).length;
+    fiche.onclick = async () => {
+      const a = lireAffectationCompositions();
+      const touches = Object.keys(a.reglagesSynthes?.[String(numero)]?.[synthe] ?? {});
+      if (a.reglagesSynthes?.[String(numero)]) delete a.reglagesSynthes[String(numero)][synthe];
+      ecrireAffectationCompositions(a);
+      if (ip && enLigne)
+        for (const nom of touches) {
+          const p = parametres.find((x) => x.nom === nom);
+          if (p) await osc(ip, "/synth", `tous ${p.nom} ${p.init}`);
+        }
+      cleRendue = "";
+      rendre();
+    };
+    ligne.append(fiche);
+    corps.append(ligne);
   };
 
   /** Un onglet de pédale : tous ses paramètres (pedalboard de la piste), et ce qui part au module. */

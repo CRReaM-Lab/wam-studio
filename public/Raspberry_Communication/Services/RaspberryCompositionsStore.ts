@@ -26,6 +26,9 @@ export type AffectationCompositions = {
   general?: { niveau?: number; muet?: boolean };
   /** Le limiteur de sortie de chaque module, par numéro (`/limiteur plafond|relache`) ; absent : ses valeurs par défaut. */
   limiteurs?: Record<string, ReglageLimiteur>;
+  /** Les réglages du synthé de chaque module, par numéro puis par synthé puis par paramètre
+   *  (`/JUNO6v2/MAIN/VCF/FREQ` → 0.6) : envoyés en `/synth tous`, et de nouveau à chaque lecture. */
+  reglagesSynthes?: Record<string, Record<string, Record<string, number>>>;
 };
 
 /** Le limiteur de sortie d'un module (`plafond~`) : plafond en dB (−20…0), relâchement en s (0,01…2). */
@@ -97,6 +100,31 @@ function limiteurs(valeur: unknown): Pick<AffectationCompositions, "limiteurs"> 
   return Object.keys(resultat).length ? { limiteurs: resultat } : {};
 }
 
+function reglagesSynthes(valeur: unknown): Pick<AffectationCompositions, "reglagesSynthes"> {
+  if (!valeur || typeof valeur !== "object") return {};
+  const resultat: Record<string, Record<string, Record<string, number>>> = {};
+  for (const [numero, parSynthe] of Object.entries(valeur as Record<string, unknown>)) {
+    if (!/^\d+$/.test(numero) || !parSynthe || typeof parSynthe !== "object") continue;
+    for (const [synthe, reglages] of Object.entries(parSynthe as Record<string, unknown>)) {
+      if (!synthe.trim() || !reglages || typeof reglages !== "object") continue;
+      for (const [parametre, v] of Object.entries(reglages as Record<string, unknown>)) {
+        // Un nom de paramètre part dans un message OSC : pas d'espace.
+        if (typeof v !== "number" || !Number.isFinite(v) || !parametre || /\s/.test(parametre)) continue;
+        ((resultat[numero] ??= {})[synthe] ??= {})[parametre] = v;
+      }
+    }
+  }
+  return Object.keys(resultat).length ? { reglagesSynthes: resultat } : {};
+}
+
+/** Règle un paramètre du synthé d'un module (retenu avec le projet). */
+export function affecterReglageSynthe(numero: number, synthe: string, parametre: string, valeur: number): void {
+  const a = lireAffectationCompositions();
+  const tous = (a.reglagesSynthes ??= {});
+  ((tous[String(numero)] ??= {})[synthe] ??= {})[parametre] = valeur;
+  ecrireAffectationCompositions(a);
+}
+
 /** Règle le limiteur d'un module (retenu avec le projet). */
 export function affecterLimiteur(numero: number, changement: ReglageLimiteur): void {
   const a = lireAffectationCompositions();
@@ -135,6 +163,7 @@ export function lireAffectationBrute(valeur: unknown): AffectationCompositions {
     synthes: noms(item.synthes),
     ...general(item.general),
     ...limiteurs(item.limiteurs),
+    ...reglagesSynthes(item.reglagesSynthes),
   };
 }
 

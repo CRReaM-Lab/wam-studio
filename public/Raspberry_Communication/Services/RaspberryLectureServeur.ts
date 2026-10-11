@@ -48,10 +48,15 @@ export function evenementsInstruments(departMs: number, ipDuModule: (numero: num
     if (i.banque !== 0) evenements.push({ tMs: departMs, ip, adresse: "/bank", valeur: String(i.banque) });
     evenements.push({ tMs: departMs, ip, adresse: "/pgm", valeur: String(i.programme) });
   }
-  // Le synthé des modules qui jouent faust (sans effet sur une autre composition).
-  for (const [numero, synthe] of Object.entries(lireAffectationCompositions().synthes)) {
+  // Le synthé des modules qui jouent faust (sans effet sur une autre composition), puis ses
+  // réglages : /instrument reconstruit les voix avec les valeurs de la fiche.
+  const affectation = lireAffectationCompositions();
+  for (const [numero, synthe] of Object.entries(affectation.synthes)) {
     const ip = ipDuModule(Number(numero));
-    if (ip) evenements.push({ tMs: departMs, ip, adresse: "/instrument", valeur: synthe });
+    if (!ip) continue;
+    evenements.push({ tMs: departMs, ip, adresse: "/instrument", valeur: synthe });
+    for (const [parametre, v] of Object.entries(affectation.reglagesSynthes?.[numero]?.[synthe] ?? {}))
+      evenements.push({ tMs: departMs, ip, adresse: "/synth", valeur: `tous ${parametre} ${v}` });
   }
   return evenements;
 }

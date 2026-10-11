@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+afterEach(() => vi.unstubAllGlobals());
 import { ongletsInspecteur, pasParametre, texteValeur } from "../../Views/RaspberryInspecteur";
 
 describe("l'inspecteur de la piste", () => {
@@ -26,5 +28,29 @@ describe("les noms courts des paramètres d'une pédale", () => {
     expect(nomsCourts(["/s/a/level", "/s/b/level"])).toEqual(["a/level", "b/level"]);
     expect(nomsCourts(["Wet", "Dry"])).toEqual(["Wet", "Dry"]);
     expect(nomsCourts(["/sweetwah/freq"])).toEqual(["freq"]);
+  });
+});
+
+describe("les réglages des instruments", () => {
+  it("rangés par groupe Faust, ou par le premier mot du libellé (Cmajor)", async () => {
+    const { groupesParametres } = await import("../../Views/RaspberryInspecteur");
+    const p = (nom: string, libelle: string, groupe: string) =>
+      ({ nom, libelle, groupe, genre: "curseur" as const, min: 0, max: 1, init: 0, pas: 0.01, choix: [] });
+    expect(groupesParametres([p("/J/MAIN/VCF/FREQ", "FREQ", "MAIN/VCF"), p("/J/MAIN/ENV/A", "A", "MAIN/ENV"), p("/J/MAIN/VCF/RES", "RES", "MAIN/VCF")])
+      .map((g) => [g.groupe, g.parametres.length])).toEqual([["VCF", 2], ["ENV", 1]]);
+    expect(groupesParametres([p("FilterCutoff", "Filter Cutoff", ""), p("DelayTime", "Delay Effect Time", "")]).map((g) => g.groupe)).toEqual(["Filter", "Delay"]);
+  });
+
+  it("gardés avec le projet, sans nom à espace, et renvoyés après /instrument à la lecture", async () => {
+    const store = await import("../../Services/RaspberryCompositionsStore");
+    const a = store.lireAffectationBrute({ synthes: { "33": "juno6v2" }, reglagesSynthes: { "33": { juno6v2: { "/JUNO6v2/MAIN/VCF/FREQ": 0.6, "a b": 1, x: "y" } }, nope: {} } });
+    expect(a.reglagesSynthes).toEqual({ "33": { juno6v2: { "/JUNO6v2/MAIN/VCF/FREQ": 0.6 } } });
+    const stockage = new Map([["wam-compositions-projet", JSON.stringify(a)]]);
+    vi.stubGlobal("window", { localStorage: { getItem: (k: string) => stockage.get(k) ?? null } });
+    const { evenementsInstruments } = await import("../../Services/RaspberryLectureServeur");
+    expect(evenementsInstruments(0, () => "192.168.1.33").map((e) => `${e.adresse} ${e.valeur}`)).toEqual([
+      "/instrument juno6v2",
+      "/synth tous /JUNO6v2/MAIN/VCF/FREQ 0.6",
+    ]);
   });
 });
