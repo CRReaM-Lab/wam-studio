@@ -22,12 +22,16 @@ const STYLE = `
 #${ID_OVERLAY} button { cursor: pointer; }
 #${ID_OVERLAY} button:disabled { opacity: .5; cursor: default; }
 #${ID_OVERLAY} .ligne { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
-#${ID_OVERLAY} .case { padding: 10px; margin: 8px 0; border: 1px solid #333a43; border-radius: 10px; background: #1a1e24; }
+#${ID_OVERLAY} .case { padding: 8px 10px; margin: 8px 0; border: 1px solid #333a43; border-radius: 10px; background: #1a1e24; }
+#${ID_OVERLAY} .case .ligne { flex-wrap: nowrap; margin: 4px 0; }
+#${ID_OVERLAY} .case .nomCase { flex: 1; min-width: 60px; }
+#${ID_OVERLAY} .case .reglages { flex-wrap: wrap; }
 #${ID_OVERLAY} .aide { color: #9aa1ab; font-size: 12px; }
 #${ID_OVERLAY} .message { margin: 8px 0; color: #cfd3d8; }
 #${ID_OVERLAY} label.reglage { display: inline-flex; flex-direction: column; gap: 2px; color: #9aa1ab; font-size: 12px; }
-#${ID_OVERLAY} input[type=range] { min-height: 32px; width: 120px; padding: 0; }
-#${ID_OVERLAY} audio { height: 36px; max-width: 220px; }
+#${ID_OVERLAY} input[type=range] { min-height: 28px; width: 84px; padding: 0; }
+#${ID_OVERLAY} audio { height: 36px; flex: 1; min-width: 100px; max-width: 200px; }
+#${ID_OVERLAY} .case .note { width: 58px; }
 #${ID_OVERLAY} .resultat { padding: 6px 0; border-top: 1px solid #2a3038; }
 `;
 
@@ -129,20 +133,21 @@ export function ouvrirEditeurKit(options: { pourModule?: number; nom?: string; c
     const tete = el("div", "", "ligne");
     const note = el("input");
     Object.assign(note, { type: "number", min: "0", max: "127", value: String(c.note), title: "note MIDI" });
-    note.style.width = "80px";
+    note.className = "note";
     const nomNote = el("span", PERCUSSIONS_GM[c.note] ?? "", "aide");
     note.oninput = () => {
       cases[index].note = Math.min(127, Math.max(0, Math.round(Number(note.value) || 0)));
       nomNote.textContent = PERCUSSIONS_GM[cases[index].note] ?? "";
     };
     const nomCase = el("input");
-    Object.assign(nomCase, { type: "text", value: c.nom, placeholder: "nom" });
+    Object.assign(nomCase, { type: "text", value: c.nom, placeholder: "nom", title: PERCUSSIONS_GM[c.note] ?? "" });
+    nomCase.className = "nomCase";
     nomCase.oninput = () => { cases[index].nom = nomCase.value; };
     tete.append(note, nomNote, nomCase, bouton("Retirer", () => { cases.splice(index, 1); rendre(); }));
     boite.append(tete);
 
+    boite.append(el("div", c.empreinte ? c.libelleSon : "pas de son", "aide"));
     const son = el("div", "", "ligne");
-    son.append(el("span", c.empreinte ? c.libelleSon : "pas de son", "aide"));
     if (c.empreinte) {
       const ecoute = el("audio");
       Object.assign(ecoute, { controls: true, preload: "none", src: urlFichier(c.empreinte) });
@@ -167,7 +172,7 @@ export function ouvrirEditeurKit(options: { pourModule?: number; nom?: string; c
       bouton("Freesound…", () => { rechercheCase = index; requete ||= c.nom; rendre(); }));
     boite.append(son);
 
-    const reglages = el("div", "", "ligne");
+    const reglages = el("div", "", "ligne reglages");
     const curseur = (libelle: string, cle: "gain" | "pan" | "timbre", min: number, max: number) => {
       const l = el("label", "", "reglage");
       const valeur = el("span", `${libelle} ${c[cle].toFixed(2)}`);

@@ -75,6 +75,8 @@ const STYLE = `
 #${ID_OVERLAY} .choix .liste button, #${ID_OVERLAY} .defaut select { min-height: 44px; padding: 0 12px; border-radius: 8px;
   border: 1px solid #3b4046; background: #22272e; color: #e6e8eb; font: 13px "IBM Plex Sans", system-ui, sans-serif; cursor: pointer; }
 #${ID_OVERLAY} .choix .liste button[aria-pressed="true"] { border-color: #6fb6ff; background: #1f2a3a; }
+#${ID_OVERLAY} .choix select, #${ID_OVERLAY} .choix input[type=number] { border-radius: 8px; border: 1px solid #3b4046;
+  background: #22272e; color: #e6e8eb; padding: 0 10px; }
 #${ID_OVERLAY} .defaut { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 #${ID_OVERLAY} .legende { margin-top: 10px; color: #9aa1ab; font-size: 12px; line-height: 1.6; }
 `;
@@ -370,7 +372,6 @@ export function ouvrirOngletPlan(): void {
     fichier.style.display = "none";
     const importer = el("button", "Importer une SoundFont (.sf2, .sf3)…");
     importer.type = "button";
-    Object.assign(importer.style, { minHeight: "44px", marginTop: "8px" });
     importer.onclick = () => fichier.click();
     fichier.onchange = async () => {
       const f = fichier.files?.[0];
@@ -389,7 +390,6 @@ export function ouvrirOngletPlan(): void {
     // Ou fabriquer un kit de batterie (909 du drumsampler, fichiers, freesound) pour ce module.
     const kit = el("button", "Nouveau kit…");
     kit.type = "button";
-    Object.assign(kit.style, { minHeight: "44px", marginTop: "8px", marginLeft: "6px" });
     kit.onclick = () => ouvrirEditeurKit({ pourModule: numero });
     // Ou tout un dossier : SoundFonts, SFZ et leurs sons, dossiers de sons en kits.
     const dossier = el("input");
@@ -402,9 +402,11 @@ export function ouvrirOngletPlan(): void {
     };
     const importerDossier = el("button", "Importer un dossier…");
     importerDossier.type = "button";
-    Object.assign(importerDossier.style, { minHeight: "44px", marginTop: "8px", marginLeft: "6px" });
     importerDossier.onclick = () => dossier.click();
-    bloc.append(importer, fichier, kit, importerDossier, dossier);
+    const imports = el("div", "", "liste");
+    imports.style.marginTop = "8px";
+    imports.append(importer, kit, importerDossier);
+    bloc.append(imports, fichier, dossier);
 
     const message = messagesInstrument.get(numero);
     if (message) bloc.append(el("div", message, "aide"));
