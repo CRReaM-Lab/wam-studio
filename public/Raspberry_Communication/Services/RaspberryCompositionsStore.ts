@@ -21,6 +21,8 @@ export type AffectationCompositions = {
   instruments: Record<string, InstrumentSoundfont>;
   /** Le synthé d'un module qui joue `faust`, par numéro de module (`juno6v2`) ; absent : sa fiche. */
   synthes: Record<string, string>;
+  /** Le master de WAM, appliqué à tous les modules (`/volume`, `/mute`) ; absent : jamais touché. */
+  general?: { niveau?: number; muet?: boolean };
 };
 
 export type InstrumentSoundfont = { programme: number; banque: number };
@@ -62,6 +64,25 @@ function instruments(valeur: unknown): Record<string, InstrumentSoundfont> {
   return resultat;
 }
 
+function general(valeur: unknown): Pick<AffectationCompositions, "general"> {
+  if (!valeur || typeof valeur !== "object") return {};
+  const g = valeur as { niveau?: unknown; muet?: unknown };
+  const niveau = Number(g.niveau);
+  return {
+    general: {
+      ...(g.niveau !== undefined && Number.isFinite(niveau) ? { niveau: Math.min(127, Math.max(0, niveau)) } : {}),
+      ...(g.muet === true ? { muet: true } : {}),
+    },
+  };
+}
+
+/** Le master de WAM touché à la main : son niveau (Pd, 100 = 0 dB) et/ou son état coupé. */
+export function reglerGeneral(changement: { niveau?: number; muet?: boolean }): void {
+  const a = lireAffectationCompositions();
+  a.general = { ...a.general, ...changement };
+  ecrireAffectationCompositions(a);
+}
+
 /** Une affectation lue d'un projet ou du navigateur ; tout ce qui n'en a pas la forme est ignoré. */
 export function lireAffectationBrute(valeur: unknown): AffectationCompositions {
   if (!valeur || typeof valeur !== "object") return affectationVide();
@@ -72,6 +93,7 @@ export function lireAffectationBrute(valeur: unknown): AffectationCompositions {
     modules: noms(item.modules),
     instruments: instruments(item.instruments),
     synthes: noms(item.synthes),
+    ...general(item.general),
   };
 }
 

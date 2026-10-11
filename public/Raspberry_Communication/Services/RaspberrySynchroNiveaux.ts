@@ -1,6 +1,8 @@
 /**
  * Le fader de piste relié au module : le niveau choisi au fader (et le bouton M) d'une piste liée
- * part en `/level` à son module (le niveau de sa composition : skini, soundfont, faust).
+ * part en `/level` à son module (le niveau de sa composition : skini, soundfont, faust). Le master
+ * de WAM part à tous les modules en `/volume` (le volume du module, après pédales et égaliseur)
+ * et `/mute`.
  *
  * Seuls les gestes comptent (RaspberryIndicateurPisteUi les retient dans la liaison) : pendant la
  * lecture, les marqueurs (`/play`, `/attenuation`) bougent aussi le fader pour l'écoute dans WAM,
@@ -30,25 +32,42 @@ export function niveauxParModule(liaisons: RaspberryTrackBinding[]): Map<string,
   return niveaux;
 }
 
+/** Le master de WAM en messages pour chaque module : `/volume` (son niveau), `/mute`. */
+export function messagesGeneral(general: { niveau?: number; muet?: boolean } | undefined): { adresse: string; valeur: string }[] {
+  const messages: { adresse: string; valeur: string }[] = [];
+  if (typeof general?.niveau === "number") messages.push({ adresse: "/volume", valeur: String(general.niveau) });
+  if (general?.muet !== undefined) messages.push({ adresse: "/mute", valeur: general.muet ? "1" : "0" });
+  return messages;
+}
+
 export function demarrerSynchroNiveaux(params: {
   liaisons: () => RaspberryTrackBinding[];
-  enLigne: (ip: string) => boolean;
-  /** Envoie `/level <valeur>` au module ; faux : serveur non connecté. */
-  envoyer: (ip: string, valeur: string) => boolean;
+  /** Le master de WAM touché à la main (RaspberryCompositionsStore). */
+  general: () => { niveau?: number; muet?: boolean } | undefined;
+  /** Les adresses des modules en ligne. */
+  modulesEnLigne: () => string[];
+  /** Envoie `<adresse> <valeur>` au module ; faux : serveur non connecté. */
+  envoyer: (ip: string, adresse: string, valeur: string) => boolean;
 }): void {
-  const envoye = new Map<string, { niveau: number; quand: number }>();
+  /** Par module et par adresse : la valeur envoyée et quand. */
+  const envoye = new Map<string, { valeur: string; quand: number }>();
   window.setInterval(() => {
     const maintenant = Date.now();
-    const niveaux = niveauxParModule(params.liaisons());
-    for (const [ip, niveau] of niveaux) {
-      if (!params.enLigne(ip)) {
-        envoye.delete(ip);
-        continue;
-      }
-      const avant = envoye.get(ip);
-      if (avant && avant.niveau === niveau && maintenant - avant.quand < ETAT_COMPLET_MS) continue;
-      if (params.envoyer(ip, String(niveau))) envoye.set(ip, { niveau, quand: maintenant });
+    const enLigne = new Set(params.modulesEnLigne());
+    const voulus = new Map<string, string>();
+    for (const [ip, niveau] of niveauxParModule(params.liaisons())) {
+      if (enLigne.has(ip)) voulus.set(`${ip} /level`, String(niveau));
     }
-    for (const ip of [...envoye.keys()]) if (!niveaux.has(ip)) envoye.delete(ip);
+    for (const ip of enLigne) {
+      for (const m of messagesGeneral(params.general())) voulus.set(`${ip} ${m.adresse}`, m.valeur);
+    }
+    for (const [cle, valeur] of voulus) {
+      const avant = envoye.get(cle);
+      if (avant && avant.valeur === valeur && maintenant - avant.quand < ETAT_COMPLET_MS) continue;
+      const [ip, adresse] = cle.split(" ");
+      if (params.envoyer(ip, adresse, valeur)) envoye.set(cle, { valeur, quand: maintenant });
+    }
+    // Un module parti : à son retour, tout repartira.
+    for (const cle of [...envoye.keys()]) if (!voulus.has(cle)) envoye.delete(cle);
   }, INTERVALLE_MS);
 }

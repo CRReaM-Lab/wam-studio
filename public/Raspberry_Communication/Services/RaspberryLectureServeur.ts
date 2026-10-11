@@ -13,7 +13,7 @@ import { parserAdresseOscPersonnalisee } from "./RaspberryMarqueursSequenceur";
 import { lireMarqueursSequenceur } from "./RaspberryMarqueursStore";
 import type { EvenementSequenceurOsc } from "./RaspberrySequenceurOscService";
 import { lireAffectationCompositions } from "./RaspberryCompositionsStore";
-import { niveauxParModule } from "./RaspberrySynchroNiveaux";
+import { messagesGeneral, niveauxParModule } from "./RaspberrySynchroNiveaux";
 import { raspberryTrackBindingStore } from "./RaspberryTrackBindingStore";
 
 /**
@@ -21,12 +21,16 @@ import { raspberryTrackBindingStore } from "./RaspberryTrackBindingStore";
  * a été touché (une composition rechargée repart à 100 ; le serveur les envoie après son chargement).
  */
 export function evenementsNiveaux(departMs: number): EvenementProgramme[] {
-  return [...niveauxParModule(raspberryTrackBindingStore.tous())].map(([ip, niveau]) => ({
-    tMs: departMs,
-    ip,
-    adresse: "/level",
-    valeur: String(niveau),
-  }));
+  return [
+    // Le master : à tous les Pi en ligne (ip vide).
+    ...messagesGeneral(lireAffectationCompositions().general).map((m) => ({ tMs: departMs, ip: "", ...m })),
+    ...[...niveauxParModule(raspberryTrackBindingStore.tous())].map(([ip, niveau]) => ({
+      tMs: departMs,
+      ip,
+      adresse: "/level",
+      valeur: String(niveau),
+    })),
+  ];
 }
 
 /**

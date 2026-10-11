@@ -95,6 +95,8 @@ import { ouvrirMenuRegion } from "../Views/SearchRaspberryMenuRegion";
 import { demarrerLectureServeur } from "../Services/RaspberryLectureServeur";
 import { demarrerSynchroEffets } from "../Services/RaspberrySynchroEffets";
 import { demarrerSynchroNiveaux } from "../Services/RaspberrySynchroNiveaux";
+import { lireAffectationCompositions, reglerGeneral } from "../Services/RaspberryCompositionsStore";
+import { volumePisteVersNiveauPd } from "../utils/osc/CommandesOscMarqueur";
 import { EMPLACEMENTS_FX, etatEffetsModule } from "../Services/RaspberryEffetsModule";
 import { ecrireCueEnAttente, lireCueEnAttente } from "../Services/RaspberryMarqueursCueEtat";
 import { lireMarqueursSequenceur } from "../Services/RaspberryMarqueursStore";
@@ -320,11 +322,18 @@ export default class SearchRaspberryController {
                 this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/fx", OSCValue: valeur }),
             });
             // Le fader de chaque piste liée : le niveau de son module (/level).
+            // Et le master de WAM : tous les modules (/volume, /mute).
+            pont.abonnerGestesMaster(
+              (volume01) => reglerGeneral({ niveau: volumePisteVersNiveauPd(volume01) }),
+              (muet) => reglerGeneral({ muet }),
+            );
             demarrerSynchroNiveaux({
               liaisons: () => raspberryTrackBindingStore.tous(),
-              enLigne: (ip) => this.state.raspberryMap.get(ip)?.isOnline === true,
-              envoyer: (ip, valeur) =>
-                this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: "/level", OSCValue: valeur }),
+              general: () => lireAffectationCompositions().general,
+              modulesEnLigne: () =>
+                [...this.state.raspberryMap.values()].filter((r) => r.isOnline === true).map((r) => r.ip),
+              envoyer: (ip, adresse, valeur) =>
+                this.envoyerMessage({ type: "sendOSCmessage", raspIP: ip, OSCMessage: adresse, OSCValue: valeur }),
             });
             // Une seule lecture : Play dans WAM joue aussi sur les Pi, par le serveur.
             demarrerLectureServeur({

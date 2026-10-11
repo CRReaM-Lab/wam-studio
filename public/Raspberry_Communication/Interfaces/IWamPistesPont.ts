@@ -106,6 +106,13 @@ export interface IWamPistesPont {
 
   reglerVolumePistes(volume01: number, sonNumber?: number): void;
 
+  /**
+   * Les gestes sur le master (son fader, son M et celui de la barre du haut) : `surVolume` reçoit
+   * le volume (0 à 1), `surMuet` l'état coupé. Les changements venus d'ailleurs (marqueurs,
+   * chargement d'un projet) ne passent pas par ici.
+   */
+  abonnerGestesMaster(surVolume: (volume01: number) => void, surMuet: (muet: boolean) => void): void;
+
   reglerMutePistes(mute: boolean, sonNumber?: number): void;
 
   lireVolumePistes(sonNumber?: number): number;

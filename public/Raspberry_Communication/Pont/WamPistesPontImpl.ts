@@ -357,6 +357,17 @@ export default class WamPistesPontImpl implements IWamPistesPont {
     }
   }
 
+  public abonnerGestesMaster(surVolume: (volume01: number) => void, surMuet: (muet: boolean) => void): void {
+    const host = this.app.host;
+    const racine = host.element.shadowRoot;
+    const fader = racine?.getElementById("volume-slider") as HTMLInputElement | null;
+    fader?.addEventListener("input", () => surVolume(fader.valueAsNumber / 100));
+    // WAM bascule le mute dans son propre écouteur : lire l'état une fois qu'il est passé.
+    const lireMuet = () => window.setTimeout(() => surMuet(host.isMuted), 0);
+    racine?.getElementById("mute-btn")?.addEventListener("click", lireMuet);
+    document.getElementById("mute-btn")?.addEventListener("click", lireMuet);
+  }
+
   public reglerMutePistes(mute: boolean, sonNumber?: number): void {
     for (const piste of this.pistesCiblesOsc(sonNumber)) {
       piste.isMuted = mute;
