@@ -138,7 +138,7 @@ export function ouvrirOngletPlan(): void {
     select.append(new Option(`${defautParc} (celle du parc)`, ""));
     for (const c of compositions) select.append(new Option(c, c));
     select.value = affectation.defaut;
-    select.onchange = () => affecterComposition({ type: "defaut" }, select.value);
+    select.onchange = () => appliquer(() => affecterComposition({ type: "defaut" }, select.value));
     defaut.append(select);
     corps.append(defaut);
 
@@ -317,7 +317,7 @@ export function ouvrirOngletPlan(): void {
       b.type = "button";
       b.setAttribute("aria-pressed", String(actuelle === valeur));
       b.onclick = () => {
-        affecterComposition(cible.type === "module" ? { type: "module", numero: cible.numero } : { type: "section", id: cible.id, nom: cible.nom }, valeur);
+        appliquer(() => affecterComposition(cible.type === "module" ? { type: "module", numero: cible.numero } : { type: "section", id: cible.id, nom: cible.nom }, valeur));
       };
       return b;
     };
@@ -335,6 +335,32 @@ export function ouvrirOngletPlan(): void {
       boite.append(reglageTampon(cible.numero));
     }
     return boite;
+  };
+
+  /** La composition de chaque module en ligne, d'après l'affectation du projet. */
+  const compositionsEnLigne = () => {
+    const affectation = lireAffectationCompositions();
+    const r = new Map<string, string>();
+    for (const m of modules.filter((x) => x.enLigne)) {
+      const sec = impl.sections.find((s) => s.id === impl.modules[String(m.numero)]?.section);
+      r.set(m.ip, compositionDuModule(affectation, m.numero, sec ? { id: sec.id, nom: sec.nom } : null, defautParc).nom);
+    }
+    return r;
+  };
+
+  /**
+   * Change l'affectation, puis charge tout de suite la nouvelle composition sur les modules en ligne
+   * dont la composition change vraiment (`/composition N`, N : son rang dans la liste du parc), sans
+   * attendre la lecture.
+   */
+  const appliquer = (changer: () => void) => {
+    const avant = compositionsEnLigne();
+    changer();
+    for (const [ip, nom] of compositionsEnLigne()) {
+      const rang = compositions.indexOf(nom);
+      if (nom === avant.get(ip) || rang < 0) continue;
+      void fetch("/api/maintenance/osc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip, adresse: "/composition", valeur: String(rang) }) });
+    }
   };
 
   const surChangement = () => {
