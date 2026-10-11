@@ -1,6 +1,13 @@
 import { monterFenetre } from "./PanneauPiSon";
 import { FAMILLES_GM, nomGeneralMidi } from "../Services/GeneralMidi";
 import {
+  envoyerAuxModules,
+  importerSoundfont,
+  lireBibliotheque,
+  nomDepuisFichier,
+  type ListeBibliotheque,
+} from "../Services/RaspberryBibliotheque";
+import {
   affecterComposition,
   affecterInstrument,
   affecterSynthe,
@@ -121,6 +128,7 @@ export function ouvrirOngletPlan(): void {
   let modules: ModuleParc[] = [];
   let compositions: string[] = [];
   let instrumentsFaust: string[] = [];
+  let bibliotheque: ListeBibliotheque = { instruments: [], surLesPi: {} };
   let defautParc = "skini";
   let choisi: Cible | null = null;
   /** La réserve (modules hors de la salle) : repliée, elle tient sur une ligne. */
@@ -232,39 +240,154 @@ export function ouvrirOngletPlan(): void {
     );
   };
 
+  /** Envoie un message OSC à un module par le serveur ; rend l'erreur, ou "" si c'est parti. */
+  const osc = async (ip: string, adresse: string, valeur: string): Promise<string> => {
+    try {
+      const r = await fetch("/api/maintenance/osc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip, adresse, valeur }) });
+      const j = (await r.json()) as { ok: boolean; error?: string };
+      return j.ok ? "" : j.error || "refusé";
+    } catch (erreur) {
+      return erreur instanceof Error ? erreur.message : String(erreur);
+    }
+  };
+
+  /** Le dernier message du réglage d'instrument de chaque module : il survit au redessin du Plan. */
+  const messagesInstrument = new Map<number, string>();
+  const dire = (numero: number, texte: string) => {
+    messagesInstrument.set(numero, texte);
+    rendre();
+  };
+
   /**
-   * L'instrument General MIDI d'un module qui joue `soundfont` : gardé avec le projet, envoyé tout
-   * de suite au module (/pgm), et de nouveau à chaque lecture.
+   * L'instrument d'un module qui joue `soundfont` : sa SoundFont (celle de la fiche, GeneralUser_GS
+   * en General MIDI, ou un instrument de la bibliothèque du serveur : SoundFont perso, kit) et son
+   * programme. Gardé avec le projet, envoyé tout de suite au module (/soundfont, /pgm) et de nouveau
+   * à chaque lecture. Une SoundFont de la bibliothèque doit être sur le module : « Envoyer au
+   * module » la dépose (le serveur vérifie son empreinte).
    */
   const reglageInstrument = (numero: number, affectation: ReturnType<typeof lireAffectationCompositions>) => {
     const bloc = el("div");
     bloc.style.marginTop = "10px";
     const m = modules.find((x) => x.numero === numero);
     const choisi = affectation.instruments[String(numero)];
-    bloc.append(el("div", `Instrument (General MIDI, GeneralUser_GS) : ${choisi ? `${nomGeneralMidi(choisi.programme)} (${choisi.programme})` : "Piano acoustique (0, par défaut)"}`, "aide"));
-    const select = el("select");
-    Object.assign(select.style, { minHeight: "44px", font: "inherit", fontSize: "14px", maxWidth: "100%" });
-    FAMILLES_GM.forEach((f, i) => {
-      const groupe = document.createElement("optgroup");
-      groupe.label = f.famille;
-      f.instruments.forEach((nom, j) => groupe.append(new Option(`${i * 8 + j} · ${nom}`, String(i * 8 + j))));
-      select.append(groupe);
-    });
-    select.value = String(choisi?.programme ?? 0);
-    const etat = el("div", "", "aide");
-    select.onchange = async () => {
-      const programme = Number(select.value);
-      affecterInstrument(numero, { programme, banque: 0 });
-      if (!m?.enLigne) return;
+    const sf = choisi?.soundfont ?? "";
+    const instrument = bibliotheque.instruments.find((i) => i.nom === sf);
+    const surLeModule = !!m && (bibliotheque.surLesPi[sf] ?? []).includes(m.ip);
+    const styleSelect = { minHeight: "44px", font: "inherit", fontSize: "14px", maxWidth: "100%" };
+
+    // La SoundFont.
+    bloc.append(el("div", `SoundFont : ${sf || "celle de la fiche du module (GeneralUser_GS, General MIDI)"}`, "aide"));
+    const selectSf = el("select");
+    Object.assign(selectSf.style, styleSelect);
+    selectSf.append(new Option("Celle de la fiche (GeneralUser_GS, General MIDI)", ""));
+    for (const i of bibliotheque.instruments) selectSf.append(new Option(`${i.nom} (${i.genre === "kit" ? "kit" : i.extension})`, i.nom));
+    // Un choix d'un autre projet, que la bibliothèque n'a plus : montré, pour pouvoir le changer.
+    if (sf && !instrument) selectSf.append(new Option(`${sf} (absente de la bibliothèque)`, sf));
+    selectSf.value = sf;
+    selectSf.onchange = async () => {
+      const nom = selectSf.value;
+      affecterInstrument(numero, nom ? { programme: 0, banque: 0, soundfont: nom } : { programme: 0, banque: 0 });
+      const present = !!m && (bibliotheque.surLesPi[nom] ?? []).includes(m.ip);
+      if (!m?.enLigne || !nom) return;
+      if (!present) return dire(numero, `« ${nom} » n'est pas encore sur le module ${numero} : l'envoyer.`);
+      const erreur = (await osc(m.ip, "/soundfont", nom)) || (await osc(m.ip, "/pgm", "0"));
+      dire(numero, erreur ? `Échec : ${erreur}` : `Module ${numero} : ${nom}.`);
+    };
+    bloc.append(selectSf);
+
+    // Sur le module ?
+    if (sf && instrument) {
+      const ligne = el("div", "", "liste");
+      ligne.style.marginTop = "6px";
+      ligne.append(el("div", surLeModule ? "Sur le module, à jour." : "Pas sur le module, ou pas à jour.", "aide"));
+      if (!surLeModule) {
+        const envoyer = el("button", "Envoyer au module");
+        envoyer.type = "button";
+        envoyer.disabled = !m?.enLigne;
+        envoyer.onclick = async () => {
+          envoyer.disabled = true;
+          envoyer.textContent = "Envoi…";
+          try {
+            const [resultat] = await envoyerAuxModules(sf, [m!.ip]);
+            if (!resultat?.ok) throw new Error(resultat?.erreur || "échec");
+            bibliotheque = await lireBibliotheque();
+            const erreur = (await osc(m!.ip, "/soundfont", sf)) || (await osc(m!.ip, "/pgm", String(choisi?.programme ?? 0)));
+            dire(numero, erreur ? `Envoyée, mais : ${erreur}` : `« ${sf} » envoyée au module ${numero}, empreinte vérifiée.`);
+          } catch (erreur) {
+            dire(numero, `Échec de l'envoi : ${erreur instanceof Error ? erreur.message : String(erreur)}`);
+          }
+        };
+        ligne.append(envoyer);
+      }
+      bloc.append(ligne);
+      if (instrument.avertissements.length) bloc.append(el("div", `Attention : ${instrument.avertissements.join(" ; ")}`, "aide"));
+    }
+
+    // Le programme : la liste General MIDI pour la SoundFont de la fiche, rien pour un kit (un seul
+    // programme), un numéro pour une SoundFont perso.
+    if (!sf) {
+      bloc.append(el("div", `Instrument (General MIDI) : ${choisi ? `${nomGeneralMidi(choisi.programme)} (${choisi.programme})` : "Piano acoustique (0, par défaut)"}`, "aide"));
+      const select = el("select");
+      Object.assign(select.style, styleSelect);
+      FAMILLES_GM.forEach((f, i) => {
+        const groupe = document.createElement("optgroup");
+        groupe.label = f.famille;
+        f.instruments.forEach((nom, j) => groupe.append(new Option(`${i * 8 + j} · ${nom}`, String(i * 8 + j))));
+        select.append(groupe);
+      });
+      select.value = String(choisi?.programme ?? 0);
+      select.onchange = async () => {
+        const programme = Number(select.value);
+        affecterInstrument(numero, { programme, banque: 0 });
+        if (!m?.enLigne) return;
+        const erreur = await osc(m.ip, "/pgm", String(programme));
+        dire(numero, erreur ? `Échec : ${erreur}` : `Envoyé au module ${numero}.`);
+      };
+      bloc.append(select);
+    } else if (instrument?.genre !== "kit") {
+      const ligne = el("div", "", "liste");
+      ligne.style.marginTop = "6px";
+      ligne.append(el("div", "Programme (0–127) :", "aide"));
+      const champ = el("input");
+      Object.assign(champ, { type: "number", min: "0", max: "127", step: "1", value: String(choisi?.programme ?? 0) });
+      Object.assign(champ.style, { ...styleSelect, width: "90px" });
+      champ.onchange = async () => {
+        const programme = Math.min(127, Math.max(0, Math.round(Number(champ.value) || 0)));
+        affecterInstrument(numero, { programme, banque: choisi?.banque ?? 0, soundfont: sf });
+        if (!m?.enLigne || !surLeModule) return;
+        const erreur = await osc(m.ip, "/pgm", String(programme));
+        dire(numero, erreur ? `Échec : ${erreur}` : `Programme ${programme} envoyé au module ${numero}.`);
+      };
+      ligne.append(champ);
+      bloc.append(ligne);
+    }
+
+    // Importer une SoundFont perso dans la bibliothèque, et la donner à ce module.
+    const fichier = el("input");
+    Object.assign(fichier, { type: "file", accept: ".sf2,.sf3" });
+    fichier.style.display = "none";
+    const importer = el("button", "Importer une SoundFont (.sf2, .sf3)…");
+    importer.type = "button";
+    Object.assign(importer.style, { minHeight: "44px", marginTop: "8px" });
+    importer.onclick = () => fichier.click();
+    fichier.onchange = async () => {
+      const f = fichier.files?.[0];
+      if (!f) return;
+      const nom = nomDepuisFichier(f.name);
+      dire(numero, `Import de ${f.name} (${(f.size / 1e6).toFixed(1)} Mo)…`);
       try {
-        const r = await fetch("/api/maintenance/osc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip: m.ip, adresse: "/pgm", valeur: String(programme) }) });
-        const j = (await r.json()) as { ok: boolean; error?: string };
-        etat.textContent = j.ok ? `Envoyé au module ${numero}.` : `Échec : ${j.error}`;
+        const i = await importerSoundfont(f, nom);
+        bibliotheque = await lireBibliotheque();
+        affecterInstrument(numero, { programme: 0, banque: 0, soundfont: i.nom });
+        dire(numero, `« ${i.nom} » est dans la bibliothèque : l'envoyer au module.`);
       } catch (erreur) {
-        etat.textContent = `Échec : ${erreur instanceof Error ? erreur.message : String(erreur)}`;
+        dire(numero, `Échec de l'import : ${erreur instanceof Error ? erreur.message : String(erreur)}`);
       }
     };
-    bloc.append(select, etat);
+    bloc.append(importer, fichier);
+
+    const message = messagesInstrument.get(numero);
+    if (message) bloc.append(el("div", message, "aide"));
     return bloc;
   };
 
@@ -423,6 +546,8 @@ export function ouvrirOngletPlan(): void {
       modules = m.modules ?? [];
       compositions = c.compositions ?? [];
       instrumentsFaust = c.instrumentsFaust ?? [];
+      // La bibliothèque : le Plan s'en passe si elle ne répond pas (serveur ancien).
+      bibliotheque = await lireBibliotheque().catch(() => bibliotheque);
       defautParc = c.defaut || "skini";
       rendre();
     } catch (erreur) {

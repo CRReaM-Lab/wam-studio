@@ -34,14 +34,17 @@ export function evenementsNiveaux(departMs: number): EvenementProgramme[] {
 }
 
 /**
- * Les instruments soundfont du projet, au départ de la lecture : /bank puis /pgm à chaque module
- * qui en a un (le serveur les envoie après /composition et son délai de chargement).
+ * Les instruments soundfont du projet, au départ de la lecture : /soundfont (le fichier, s'il
+ * vient de la bibliothèque), /bank puis /pgm à chaque module qui en a un (le serveur les envoie
+ * après /composition et son délai de chargement ; le module réapplique banque et programme après
+ * avoir ouvert le fichier).
  */
 export function evenementsInstruments(departMs: number, ipDuModule: (numero: number) => string | undefined): EvenementProgramme[] {
   const evenements: EvenementProgramme[] = [];
   for (const [numero, i] of Object.entries(lireAffectationCompositions().instruments)) {
     const ip = ipDuModule(Number(numero));
     if (!ip) continue;
+    if (i.soundfont) evenements.push({ tMs: departMs, ip, adresse: "/soundfont", valeur: i.soundfont });
     if (i.banque !== 0) evenements.push({ tMs: departMs, ip, adresse: "/bank", valeur: String(i.banque) });
     evenements.push({ tMs: departMs, ip, adresse: "/pgm", valeur: String(i.programme) });
   }

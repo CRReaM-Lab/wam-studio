@@ -17,7 +17,8 @@ export type AffectationCompositions = {
   sections: Record<string, string>;
   /** Par numéro de module. */
   modules: Record<string, string>;
-  /** L'instrument d'un module qui joue `soundfont`, par numéro de module (General MIDI). */
+  /** L'instrument d'un module qui joue `soundfont`, par numéro de module : sa SoundFont (de la
+   *  bibliothèque du serveur ; absente : celle de la fiche, General MIDI) et son programme. */
   instruments: Record<string, InstrumentSoundfont>;
   /** Le synthé d'un module qui joue `faust`, par numéro de module (`juno6v2`) ; absent : sa fiche. */
   synthes: Record<string, string>;
@@ -25,7 +26,15 @@ export type AffectationCompositions = {
   general?: { niveau?: number; muet?: boolean };
 };
 
-export type InstrumentSoundfont = { programme: number; banque: number };
+export type InstrumentSoundfont = {
+  programme: number;
+  banque: number;
+  /** Le nom d'un instrument de la bibliothèque (`sf/<nom>` sur le module, `/soundfont <nom>`). */
+  soundfont?: string;
+};
+
+/** Même règle que le serveur (Bibliotheque.fs) : le nom devient un nom de fichier sur le module. */
+const NOM_SOUNDFONT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 const CLE_STOCKAGE = "wam-compositions-projet";
 export const EVENEMENT_COMPOSITIONS = "wam-compositions-projet";
@@ -58,7 +67,8 @@ function instruments(valeur: unknown): Record<string, InstrumentSoundfont> {
     const i = v as Partial<InstrumentSoundfont> | null;
     const programme = Number(i?.programme), banque = Number(i?.banque ?? 0);
     if (Number.isInteger(programme) && programme >= 0 && programme <= 127 && Number.isInteger(banque) && banque >= 0) {
-      resultat[cle] = { programme, banque };
+      const soundfont = typeof i?.soundfont === "string" && NOM_SOUNDFONT.test(i.soundfont) ? i.soundfont : undefined;
+      resultat[cle] = { programme, banque, ...(soundfont ? { soundfont } : {}) };
     }
   }
   return resultat;
