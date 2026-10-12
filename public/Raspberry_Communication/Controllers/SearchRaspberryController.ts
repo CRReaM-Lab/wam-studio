@@ -332,7 +332,6 @@ export default class SearchRaspberryController {
             demarrerInspecteur(pont);
             // Un autre projet chargé : ses réglages des modules partent tout de suite.
             demarrerApplicationProjet({
-              lireIdProjet: () => pont.lireProjet().id,
               modulesEnLigne: () =>
                 [...this.state.raspberryMap.values()]
                   .filter((r) => r.isOnline === true)

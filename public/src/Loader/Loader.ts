@@ -11,6 +11,7 @@ import { appliquerIndicateurRaspberry } from "../../Raspberry_Communication/Serv
 import { raspberryTrackBindingStore } from "../../Raspberry_Communication/Services/RaspberryTrackBindingStore";
 import { declencherSynchronisationPistesRaspberry } from "../../Raspberry_Communication/Services/RaspberryPisteSynchronisation";
 import { ecrireMarqueursSequenceur, lireMarqueursSequenceur } from "../../Raspberry_Communication/Services/RaspberryMarqueursStore";
+import { EVENEMENT_PROJET_CHARGE } from "../../Raspberry_Communication/Services/RaspberryApplicationProjet";
 import { type AffectationCompositions, affectationVide, ecrireAffectationCompositions, lireAffectationBrute, lireAffectationCompositions } from "../../Raspberry_Communication/Services/RaspberryCompositionsStore";
 import type { MarqueurSequenceur } from "../../Raspberry_Communication/Models/MarqueurSequenceur";
 import { exporterRegionsSonsProjet } from "../../Raspberry_Communication/Services/RaspberryProjetRegionsSons";
@@ -306,6 +307,9 @@ export default class Loader {
 
         this._app.editorView.setLoading(false)
         declencherSynchronisationPistesRaspberry();
+        // Les réglages des modules du projet partent aux modules en ligne (RaspberryApplicationProjet),
+        // même quand on recharge le même projet.
+        window.dispatchEvent(new CustomEvent(EVENEMENT_PROJET_CHARGE));
     }
 
     loadTrackRegions(track: Track, regions: ProjectData['tracks'][0]['regions'], contents: (id:string)=>XMLHttpRequest) {

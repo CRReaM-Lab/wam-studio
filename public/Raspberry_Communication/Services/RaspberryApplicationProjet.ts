@@ -1,5 +1,5 @@
 /**
- * Un autre projet chargé : ses réglages des modules partent tout de suite aux modules en ligne,
+ * Un projet chargé (un autre, ou le même rouvert) : ses réglages des modules partent tout de suite aux modules en ligne,
  * au lieu d'attendre la prochaine lecture. Le synthé et ses réglages (`/instrument` reconstruit
  * les voix avec la fiche, puis `/synth tous`), la SoundFont et le programme, et le limiteur
  * (valeurs par défaut quand le projet n'en dit rien, sinon l'ancien projet resterait). La
@@ -29,22 +29,22 @@ export function messagesProjet(
   return messages;
 }
 
+/** Émis par le chargeur (Loader) à la fin du chargement d'un projet. */
+export const EVENEMENT_PROJET_CHARGE = "wam-projet-charge";
+
 export function demarrerApplicationProjet(params: {
-  lireIdProjet: () => string;
   modulesEnLigne: () => { numero: number; ip: string }[];
   envoyer: (ip: string, adresse: string, valeur: string) => boolean;
-  /** Appelé au changement de projet, avant l'envoi (fermer ce qui montre l'ancien). */
+  /** Appelé au chargement, avant l'envoi (fermer ce qui montre l'ancien). */
   surChangement?: () => void;
 }): void {
-  let projet = params.lireIdProjet();
-  window.setInterval(() => {
-    const id = params.lireIdProjet();
-    if (id === projet) return;
-    projet = id;
+  // À chaque chargement, même du projet déjà ouvert (rouvert après des réglages faits à la main).
+  window.addEventListener(EVENEMENT_PROJET_CHARGE, () => {
     params.surChangement?.();
-    // Le chargeur a déjà écrit l'affectation du nouveau projet.
+    // Le chargeur a déjà écrit l'affectation du projet.
     const messages = messagesProjet(lireAffectationCompositions(), params.modulesEnLigne(), (ipDe) => evenementsInstruments(0, ipDe));
-    for (const m of messages) params.envoyer(m.ip, m.adresse, m.valeur);
-    if (messages.length) console.info(`[raspberry] projet ${id} : ${messages.length} réglage(s) envoyé(s) aux modules en ligne`);
-  }, 1000);
+    let partis = 0;
+    for (const m of messages) if (params.envoyer(m.ip, m.adresse, m.valeur)) partis++;
+    console.info(`[raspberry] projet chargé : ${partis}/${messages.length} réglage(s) envoyé(s) aux modules en ligne`);
+  });
 }
