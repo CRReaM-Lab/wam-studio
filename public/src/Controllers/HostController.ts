@@ -425,6 +425,11 @@ export default class HostController {
       this._app.projectController.openSaveWindow();
       this.focus(this._app.projectView);
     })
+    // Repartir d'un projet vide : pistes, marqueurs, compositions et réglages des modules remis à zéro.
+    this._view.newBtn.addEventListener("click", () => {
+      if (!window.confirm("Nouveau projet : ce qui n'est pas enregistré dans le projet ouvert sera perdu. Continuer ?")) return;
+      void this._app.loader.nouveauProjet();
+    })
     this._view.loadBtn.addEventListener("click", () => {
       this._app.projectController.openLoadWindow();
       this.focus(this._app.projectView);

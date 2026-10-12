@@ -57,6 +57,7 @@ export default class HostView {
     settingsBtn = document.getElementById("settings-btn") as HTMLDivElement
     saveBtn = document.getElementById("save-project") as HTMLDivElement
     loadBtn = document.getElementById("load-project") as HTMLDivElement
+    newBtn = document.getElementById("new-project") as HTMLDivElement
     loginBtn = document.getElementById("login") as HTMLDivElement
     exportProject = document.getElementById("export-project") as HTMLInputElement
 

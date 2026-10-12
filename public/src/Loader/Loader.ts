@@ -218,6 +218,25 @@ export default class Loader {
         return [project,contents]
     }
 
+    /**
+     * Un projet vide, chargé comme un autre : pas de pistes ni de marqueurs, les compositions et
+     * réglages des modules de personne (ceux du parc, envoyés aux modules en ligne), tempo 120 en
+     * 4/4, le master sans effets ; un nouvel identifiant, sans nom.
+     */
+    async nouveauProjet() {
+        await this._app.host.connectPlugin(null)
+        this.metaChargee = undefined
+        this.migrationsAuChargement = []
+        const vide: ProjectData = {
+            version: CURRENT_PROJECT_VERSION,
+            host: { playhead: 0, tempo: 120, time_signature: [4, 4], volume: 0.5 },
+            tracks: [],
+            marqueurs: [],
+            compositions: affectationVide(),
+        }
+        await this.loadProject(vide, () => { throw new Error("un projet vide n'a pas de contenu à lire") })
+    }
+
     async loadProject(data: ProjectData, contents: (id:string)=>XMLHttpRequest) {
         this._app.editorView.setLoading(true)
         let project: ProjectData = data;
