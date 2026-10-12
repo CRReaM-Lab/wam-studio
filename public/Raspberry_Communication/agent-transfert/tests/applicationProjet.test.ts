@@ -18,3 +18,18 @@ describe("un autre projet chargé", () => {
     ]);
   });
 });
+
+describe("la composition de chaque module au chargement d'un projet", () => {
+  it("celle du module, de sa section, du projet, sinon du parc ; en rang", async () => {
+    const { compositionsProjet } = await import("../../Services/RaspberryApplicationProjet");
+    const a = { ...affectationVide(), defaut: "", modules: { "33": "soundfont" }, sections: { s1: "faust" } };
+    const parc = {
+      sections: [{ id: "s1", nom: "Synthés" }],
+      sectionDe: { "34": "s1" },
+      compositions: ["EliseEtJose", "skini", "faust", "soundfont"],
+      defaut: "skini",
+    };
+    const m = compositionsProjet(a, [{ numero: 33, ip: "a" }, { numero: 34, ip: "b" }, { numero: 35, ip: "c" }], parc);
+    expect(m.map((x) => `${x.ip} ${x.valeur}`)).toEqual(["a 3", "b 2", "c 1"]);
+  });
+});
