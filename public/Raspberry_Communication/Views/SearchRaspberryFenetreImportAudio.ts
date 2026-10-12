@@ -81,6 +81,8 @@ export function ouvrirFenetreImportAudio(params: {
   /** Faire jouer le son par le module (`/play`) ; null : le fichier n'a pas de numéro skini. */
   jouerSurPi?: (ip: string, fichier: string) => string | null;
 }): void {
+  // Les sons écoutés, gardés le temps que la fenêtre est ouverte : réécouter ne retélécharge pas.
+  const ecoutes = new Map<string, Blob>();
   fermerOverlay();
 
   const enLigne = params.cibles.filter((cible) => cible.enLigne);
@@ -305,13 +307,18 @@ export function ouvrirFenetreImportAudio(params: {
           }
           arreterEcoute();
           ecouter.textContent = "…";
-          const r = await params.telecharger!(ip, nom);
-          if (!r.ok) {
-            ecouter.textContent = "▶";
-            statut.innerText = `${nom} : ${r.error}`;
-            return;
+          let blob = ecoutes.get(cle);
+          if (!blob) {
+            const r = await params.telecharger!(ip, nom);
+            if (!r.ok) {
+              ecouter.textContent = "▶";
+              statut.innerText = `${nom} : ${r.error}`;
+              return;
+            }
+            blob = r.blob;
+            ecoutes.set(cle, blob);
           }
-          const audio = new Audio(URL.createObjectURL(r.blob));
+          const audio = new Audio(URL.createObjectURL(blob));
           lecteur = { audio, cle, bouton: ecouter };
           ecouter.textContent = "■";
           ecouter.setAttribute("aria-pressed", "true");
