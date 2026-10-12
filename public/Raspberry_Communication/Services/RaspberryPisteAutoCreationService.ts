@@ -11,6 +11,14 @@ export default class RaspberryPisteAutoCreationService {
 
   constructor(private readonly liaison: RaspberryPisteLiaisonService) {}
 
+  /**
+   * Oublie les modules déjà pourvus d'une piste (nouveau projet) : chaque module en ligne en
+   * reçoit de nouveau une. Sans ça, une piste retirée exprès n'est pas recréée de la session.
+   */
+  public oublier(): void {
+    this.idsDejaAssures.clear();
+  }
+
   public async traiterCarteRaspberry(
     raspberryMap: Map<string, Raspberry>,
     ipsAttendues: string[]

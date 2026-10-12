@@ -9,7 +9,7 @@ import Track from "../Models/Track/Track";
 import { audioCtx } from "../index";
 import { appliquerIndicateurRaspberry } from "../../Raspberry_Communication/Services/RaspberryIndicateurPisteUi";
 import { raspberryTrackBindingStore } from "../../Raspberry_Communication/Services/RaspberryTrackBindingStore";
-import { declencherSynchronisationPistesRaspberry } from "../../Raspberry_Communication/Services/RaspberryPisteSynchronisation";
+import { declencherSynchronisationPistesRaspberry, EVENEMENT_NOUVEAU_PROJET } from "../../Raspberry_Communication/Services/RaspberryPisteSynchronisation";
 import { ecrireMarqueursSequenceur, lireMarqueursSequenceur } from "../../Raspberry_Communication/Services/RaspberryMarqueursStore";
 import { EVENEMENT_PROJET_CHARGE } from "../../Raspberry_Communication/Services/RaspberryApplicationProjet";
 import { type AffectationCompositions, affectationVide, ecrireAffectationCompositions, lireAffectationBrute, lireAffectationCompositions } from "../../Raspberry_Communication/Services/RaspberryCompositionsStore";
@@ -234,6 +234,9 @@ export default class Loader {
             marqueurs: [],
             compositions: affectationVide(),
         }
+        // Une piste par module en ligne, aucune pour les autres : les modules déjà pourvus dans la
+        // session sont oubliés avant, la synchronisation de fin de chargement crée leurs pistes.
+        window.dispatchEvent(new CustomEvent(EVENEMENT_NOUVEAU_PROJET))
         await this.loadProject(vide, () => { throw new Error("un projet vide n'a pas de contenu à lire") })
     }
 

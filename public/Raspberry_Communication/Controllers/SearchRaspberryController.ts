@@ -72,7 +72,7 @@ import RaspberryImportAudioService from "../Services/RaspberryImportAudioService
 import RaspberrySequenceurOscService from "../Services/RaspberrySequenceurOscService";
 import { retirerLibellesSons } from "../Services/RaspberryLibellesSonsStore";
 import RaspberryProjetLocalPersistance from "../Services/RaspberryProjetLocalPersistance";
-import { enregistrerSynchronisationPistesRaspberry } from "../Services/RaspberryPisteSynchronisation";
+import { EVENEMENT_NOUVEAU_PROJET, enregistrerSynchronisationPistesRaspberry } from "../Services/RaspberryPisteSynchronisation";
 import { restaurerLibellesRegions, nommerRegionApresEnregistrement } from "../Services/RaspberryNomRegionService";
 import { demarrerAffichageMarqueursPiste } from "../Services/RaspberryMarqueursPisteUi";
 import { demarrerCueLecturePistes } from "../Services/RaspberryMarqueursCueLecture";
@@ -371,6 +371,9 @@ export default class SearchRaspberryController {
             });
             demarrerReveilAudioContexte(pont);
             this.persistancePistes?.demarrerAutosave();
+            // Un nouveau projet : chaque module en ligne recevra sa piste (la synchronisation de fin
+            // de chargement), même déjà créée plus tôt dans la session.
+            window.addEventListener(EVENEMENT_NOUVEAU_PROJET, () => this.autoCreationPistes?.oublier());
             enregistrerSynchronisationPistesRaspberry(() => {
               void this.synchroniserPistesPourRaspberryEnLigne();
             });

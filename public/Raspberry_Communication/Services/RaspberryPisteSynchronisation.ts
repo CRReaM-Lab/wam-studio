@@ -14,3 +14,6 @@ export function enregistrerSynchronisationPistesRaspberry(
 export function declencherSynchronisationPistesRaspberry(): void {
   callbackSynchronisation?.();
 }
+
+/** Émis par « Nouveau projet » : une piste par module en ligne, et aucune pour les autres. */
+export const EVENEMENT_NOUVEAU_PROJET = "wam-nouveau-projet";
